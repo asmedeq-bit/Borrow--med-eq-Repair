@@ -3197,117 +3197,174 @@ async function renderSum(r){
         var _peakEq=snapStats.length>0?snapStats.reduce(function(a,b){return b.peak>a.peak?b:a;}):null;
         var _totalRecords=snapStats.reduce(function(s,e){return s+e.totalDays;},0);
 
-        // ── 4 summary cards ──
+        // unique IDs
+        var _uid='snp_'+Math.random().toString(36).substr(2,6);
+        var _tblId=_uid+'_tbl';
+        var _barId=_uid+'_bar';
+        var _barH=Math.max(200,snapStats.length*44+80);
+
+        // ── 4 summary cards (คลิกกรอง) ──
         var _cards='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">'
-          // card 1: วันที่มีข้อมูล
-          +'<div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:14px;text-align:center">'
+          +'<div class="snp-card" data-filter="" style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border .15s">'
             +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">วันที่มีข้อมูล</div>'
             +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--tx);line-height:1">'+_snapDayCount+'</div>'
             +'<div style="font-size:11px;color:var(--mu);margin-top:4px">วัน</div>'
           +'</div>'
-          // card 2: AVG On Loan รวม
-          +'<div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:14px;text-align:center">'
+          +'<div class="snp-card" data-filter="" style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border .15s">'
             +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">AVG On Loan รวม</div>'
             +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--ac);line-height:1">'+_totalAvgOnLoan.toFixed(1)+'</div>'
             +'<div style="font-size:11px;color:var(--mu);margin-top:4px">เครื่อง/วัน</div>'
           +'</div>'
-          // card 3: Utilization เฉลี่ย
-          +'<div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:14px;text-align:center">'
+          +'<div class="snp-card" data-filter="high" style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border .15s" title="คลิกเพื่อดูเฉพาะ Utilization สูง (&gt;50%)">'
             +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">Utilization เฉลี่ย</div>'
             +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--wn);line-height:1">'+(_avgUtil!==null?_avgUtil:'—')+'</div>'
-            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">% ของ Active</div>'
+            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">% ของ Active <span style="font-size:9px;opacity:.7">▼ กรอง</span></div>'
           +'</div>'
-          // card 4: Peak สูงสุด
-          +'<div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:14px;text-align:center">'
+          +'<div class="snp-card" data-filter="peak" style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border .15s" title="คลิกเพื่อ highlight เครื่องที่ Peak สูงสุด">'
             +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">สูงสุด (Peak)</div>'
             +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--er);line-height:1">'+(_peakEq?_peakEq.peak:'—')+'</div>'
-            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">'+(_peakEq?_peakEq.name:'')+'</div>'
+            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">'+(_peakEq?_peakEq.name:'')+'<span style="font-size:9px;opacity:.7"> ▼ กรอง</span></div>'
           +'</div>'
         +'</div>';
 
-        // ── ตารางรายเครื่อง ──
-        var _trows=snapStats.map(function(e){
+        // ── ตารางรายเครื่อง (มี data-eq สำหรับ interaction) ──
+        var _trows=snapStats.map(function(e,ri){
           var uPct=e.utilPct!==null?e.utilPct:null;
-          var uColor=uPct!==null?(uPct>=80?'#ef4444':uPct>=50?'#d97706':'#15803d'):'var(--mu)';
-          // bar + %
+          var uColor=uPct!==null?(uPct>=80?'#ef4444':uPct>=50?'#d97706':'#15803d'):'#555';
           var uCell=uPct!==null
-            ?'<div style="display:flex;align-items:center;gap:6px">'
-                +'<div style="flex:1;max-width:90px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden">'
-                  +'<div style="height:100%;width:'+Math.min(100,uPct)+'%;background:'+uColor+';border-radius:4px"></div>'
+            ?'<div style="display:flex;align-items:center;gap:7px">'
+                +'<div style="flex:1;max-width:100px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden">'
+                  +'<div style="height:100%;width:'+Math.min(100,uPct)+'%;background:'+uColor+';border-radius:4px;transition:width .3s"></div>'
                 +'</div>'
-                +'<span style="font-size:12px;font-weight:700;color:'+uColor+';font-family:var(--mo);white-space:nowrap">'+uPct+'%</span>'
+                +'<span style="font-size:12px;font-weight:700;color:'+uColor+';font-family:var(--mo);min-width:38px">'+uPct+'%</span>'
               +'</div>'
             :'<span style="color:var(--mu)">—</span>';
           var trendTxt=e.trend==='up'
-            ?'<span style="color:var(--er);font-weight:700;font-size:12px">▲ เพิ่ม</span>'
+            ?'<span style="color:#ef4444;font-weight:700">▲ เพิ่ม</span>'
             :e.trend==='down'
-              ?'<span style="color:var(--ok);font-weight:700;font-size:12px">▼ ลด</span>'
-              :'<span style="color:var(--mu);font-size:12px">─ คงที่</span>';
-          return '<tr style="border-bottom:1px solid var(--bd)">'
-            +'<td style="padding:9px 10px;font-size:13px;font-weight:600">'+e.name+'</td>'
+              ?'<span style="color:#15803d;font-weight:700">▼ ลด</span>'
+              :'<span style="color:var(--mu)">─ คงที่</span>';
+          return '<tr class="snp-row" data-eq="'+e.name.replace(/"/g,'&quot;')+'" data-util="'+(uPct||0)+'" data-avg="'+parseFloat(e.avg)+'" data-peak="'+e.peak+'" style="border-bottom:1px solid var(--bd);cursor:pointer;transition:background .12s">'
+            +'<td style="padding:9px 10px;font-size:13px;font-weight:600">'
+              +'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+e.col+';margin-right:7px;vertical-align:middle"></span>'
+              +e.name
+            +'</td>'
             +'<td style="text-align:center;font-family:var(--mo);color:var(--ac);font-weight:700;font-size:14px">'+parseFloat(e.avg).toFixed(1)+'</td>'
             +'<td style="text-align:center;font-family:var(--mo);font-size:13px;color:var(--tx)">'+e.peak+'</td>'
-            +'<td style="text-align:center;font-family:var(--mo);font-size:13px;color:var(--ok)">'+( e.inv.active||'—')+'</td>'
-            +'<td style="padding:8px 10px;min-width:150px">'+uCell+'</td>'
-            +'<td style="text-align:center">'+trendTxt+'</td>'
+            +'<td style="text-align:center;font-family:var(--mo);font-size:13px;color:#15803d">'+( e.inv.active||'—')+'</td>'
+            +'<td style="padding:8px 10px;min-width:160px">'+uCell+'</td>'
+            +'<td style="text-align:center;font-size:12px">'+trendTxt+'</td>'
             +'</tr>';
         }).join('');
 
-        // ── กราฟแท่ง Utilization % ──
-        var _barId='snapbar_'+Math.random().toString(36).substr(2,6);
+        // ── กราฟแนวนอน (horizontal) ──
         var _barData=snapStats.filter(function(e){return e.utilPct!==null;});
-        var _barLabels=_barData.map(function(e){return e.name.length>14?e.name.substr(0,13)+'…':e.name;});
+        var _barLabels=_barData.map(function(e){return e.name;});
         var _barVals=_barData.map(function(e){return e.utilPct;});
-        var _barColors=_barVals.map(function(v){return v>=80?'rgba(239,68,68,.85)':v>=50?'rgba(180,120,0,.85)':'rgba(34,100,34,.85)';});
-        var _barH=Math.max(220,_barData.length*52+80);
+        var _barColors=_barVals.map(function(v){return v>=80?'rgba(239,68,68,.8)':v>=50?'rgba(180,120,0,.8)':'rgba(21,128,61,.8)';});
 
-        // schedule chart draw
         window._ucDrawPending=window._ucDrawPending||{};
-        window._ucDrawPending[_barId]={
-          labels:_barLabels,vals:_barVals,colors:_barColors,isVertical:true
-        };
+        window._ucDrawPending[_barId]={labels:_barLabels,vals:_barVals,colors:_barColors,isVertical:false};
 
-        return '<div style="margin-top:18px;background:var(--s1);border:1px solid var(--bd);border-radius:10px;overflow:hidden">'
-          // header
+        // ── sort state (เก็บไว้ใน closure) ──
+        var _sortCol='util',_sortAsc=false;
+
+        // ── interactive JS (inject หลัง render) ──
+        var _js='<script>(function(){'
+          // sort ตาราง
+          +'var _sc="util",_sa=false;'
+          +'function _sortTbl(col){'
+            +'if(_sc===col)_sa=!_sa;else{_sc=col;_sa=false;}'
+            +'var tbody=document.querySelector("#'+_tblId+' tbody");'
+            +'if(!tbody)return;'
+            +'var rows=Array.from(tbody.querySelectorAll("tr.snp-row"));'
+            +'rows.sort(function(a,b){'
+              +'var av=parseFloat(a.dataset[col])||0,bv=parseFloat(b.dataset[col])||0;'
+              +'return _sa?av-bv:bv-av;'
+            +'});'
+            +'rows.forEach(function(r){tbody.appendChild(r);});'
+            +'document.querySelectorAll("#'+_tblId+' th.snp-th").forEach(function(th){'
+              +'th.style.color=th.dataset.col===_sc?"var(--ac)":"var(--mu)";'
+              +'th.querySelector(".sort-arrow").textContent=th.dataset.col===_sc?(_sa?"▲":"▼"):"⇅";'
+            +'});'
+          +'}'
+          // highlight row + highlight bar
+          +'function _hlRow(eq){'
+            +'document.querySelectorAll(".snp-row").forEach(function(r){'
+              +'r.style.background=r.dataset.eq===eq?"rgba(0,200,255,.08)":"";'
+              +'r.style.outline=r.dataset.eq===eq?"1px solid rgba(0,200,255,.3)":"";'
+            +'});'
+          +'}'
+          // filter rows
+          +'function _filterRows(type){'
+            +'document.querySelectorAll(".snp-card").forEach(function(c){c.style.outline=c.dataset.filter===type?"2px solid var(--ac)":"";});'
+            +'document.querySelectorAll(".snp-row").forEach(function(r){'
+              +'var u=parseFloat(r.dataset.util)||0;'
+              +'var show=type===""||'
+                +'(type==="high"&&u>=50)||'
+                +'(type==="peak"&&r.dataset.eq===document.getElementById("'+_barId+'").dataset.peak);'
+              +'r.style.display=show?"":"none";'
+            +'});'
+          +'}'
+          // bind card clicks
+          +'document.querySelectorAll(".snp-card").forEach(function(c){'
+            +'c.addEventListener("click",function(){'
+              +'var cur=c.style.outline;'
+              +'document.querySelectorAll(".snp-card").forEach(function(x){x.style.outline="";});'
+              +'if(cur){_filterRows("");}else{c.style.outline="2px solid var(--ac)";_filterRows(c.dataset.filter);}'
+            +'})'
+          +'});'
+          // bind row clicks
+          +'document.querySelectorAll(".snp-row").forEach(function(r){'
+            +'r.addEventListener("click",function(){_hlRow(r.dataset.eq);});'
+            +'r.addEventListener("mouseenter",function(){if(!r.style.background||r.style.background==="")r.style.background="rgba(255,255,255,.03)";});'
+            +'r.addEventListener("mouseleave",function(){if(r.style.background==="rgba(255, 255, 255, 0.03)")r.style.background="";});'
+          +'});'
+          // bind th sort clicks
+          +'document.querySelectorAll("#'+_tblId+' th.snp-th").forEach(function(th){'
+            +'th.style.cursor="pointer";'
+            +'th.addEventListener("click",function(){_sortTbl(th.dataset.col);});'
+          +'});'
+          // store peak eq name on canvas for filter
+          +'var cv=document.getElementById("'+_barId+'");'
+          +'if(cv)cv.dataset.peak="'+(_peakEq?_peakEq.name.replace(/"/g,''):'')+'";'
+        +'})()</s'+'cript>';
+
+        return '<div style="background:var(--s1);border:1px solid var(--bd);border-radius:10px;overflow:hidden">'
           +'<div style="padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
             +'<div>'
-              +'<div style="font-size:13px;font-weight:700;color:var(--tx)">📊 สรุปภาพรวม Snapshot</div>'
-              +'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+_snapDateFirst+' ถึง '+_snapDateLast+' &nbsp;·&nbsp; ข้อมูล '+_snapDayCount+' วัน — '+_totalRecords+' records จาก daily_snapshots</div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--tx)">📊 สรุปภาพรวมการใช้งานเครื่องมือแพทย์</div>'
+              +'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+_snapDateFirst+' ถึง '+_snapDateLast+' · ข้อมูล '+_snapDayCount+' วัน — '+_totalRecords+' records</div>'
             +'</div>'
+            +'<div style="font-size:11px;color:var(--mu)">💡 คลิกการ์ดกรอง · คลิกหัวตารางเรียง · คลิกแถวไฮไลท์</div>'
           +'</div>'
-          // body
           +'<div style="padding:14px 16px">'
             +_cards
-            // ตาราง
-            +'<div style="overflow-x:auto;margin-bottom:16px">'
+            +'<div id="'+_tblId+'" style="overflow-x:auto;margin-bottom:16px">'
               +'<table class="dt" style="min-width:500px">'
                 +'<thead><tr>'
                   +'<th style="text-align:left">เครื่องมือ</th>'
-                  +'<th style="text-align:center">AVG/วัน</th>'
-                  +'<th style="text-align:center">Peak</th>'
+                  +'<th class="snp-th" data-col="avg" style="text-align:center;user-select:none">AVG/วัน <span class="sort-arrow" style="font-size:10px;color:var(--mu)">⇅</span></th>'
+                  +'<th class="snp-th" data-col="peak" style="text-align:center;user-select:none">Peak <span class="sort-arrow" style="font-size:10px;color:var(--mu)">⇅</span></th>'
                   +'<th style="text-align:center">Active</th>'
-                  +'<th style="text-align:left;min-width:160px">Utilization % (AVG/Active)</th>'
+                  +'<th class="snp-th" data-col="util" style="text-align:left;min-width:160px;color:var(--ac);user-select:none">Utilization% <span class="sort-arrow" style="font-size:10px">▼</span></th>'
                   +'<th style="text-align:center">แนวโน้ม</th>'
                 +'</tr></thead>'
                 +'<tbody>'+_trows+'</tbody>'
               +'</table>'
             +'</div>'
-            // legend
-            +'<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--mu);margin-bottom:14px;padding:8px 12px;background:var(--s2);border-radius:6px;line-height:1.8">'
-              +'<span><span style="color:#ef4444;font-weight:700">Utilization สูง (&gt;80%)</span> — เครื่องใกล้เต็ม ควรติดตาม</span>'
-              +'<span style="color:var(--bd)">|</span>'
-              +'<span><span style="color:#d97706;font-weight:700">ปานกลาง (50–80%)</span> — ใช้งานปกติ</span>'
-              +'<span style="color:var(--bd)">|</span>'
-              +'<span><span style="color:#15803d;font-weight:700">ต่ำ (&lt;50%)</span> — มีเครื่องสำรองเพียงพอ</span>'
-              +'<span style="color:var(--bd)">|</span>'
-              +'<span>Utilization = AVG On Loan ÷ Active × 100</span>'
+            +'<div style="display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--mu);margin-bottom:12px;padding:7px 12px;background:var(--s2);border-radius:6px">'
+              +'<span><span style="color:#ef4444;font-weight:700">■</span> &gt;80% สูง</span>'
+              +'<span><span style="color:#d97706;font-weight:700">■</span> 50–80% ปานกลาง</span>'
+              +'<span><span style="color:#15803d;font-weight:700">■</span> &lt;50% ต่ำ</span>'
+              +'<span style="margin-left:auto">Utilization = AVG On Loan ÷ Active × 100</span>'
             +'</div>'
-            // กราฟแท่ง vertical
-            +'<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">กราฟ Utilization % แยกรายเครื่องมือ</div>'
+            +'<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Utilization % รายเครื่องมือ</div>'
             +'<div style="position:relative;height:'+_barH+'px">'
-              +'<canvas id="'+_barId+'" role="img" aria-label="Bar chart utilization per equipment"></canvas>'
+              +'<canvas id="'+_barId+'" role="img" aria-label="Horizontal bar chart utilization per equipment"></canvas>'
             +'</div>'
           +'</div>'
+          +_js
         +'</div>';
       })()
       +'</div>';
@@ -5679,6 +5736,7 @@ function injectInvAdminTab(){
   }
   var panel=document.createElement('div');
   panel.className='admin-sub';panel.id='adm-inv-mgr';
+  panel.style.display='none';
   panel.innerHTML=buildInvAdminHTML();
   ac.appendChild(panel);
 }
@@ -5686,9 +5744,12 @@ function injectInvAdminTab(){
 var _origSAT=window.showAdminTab;
 window.showAdminTab=function(id,el){
   if(id==='inv-mgr'){
-    document.querySelectorAll('.admin-sub').forEach(function(s){s.classList.remove('on');});
+    // ── inject ก่อนถ้ายังไม่มี panel ──
+    if(!document.getElementById('adm-inv-mgr')&&window.injectInvAdminTab)injectInvAdminTab();
+    document.querySelectorAll('.admin-sub').forEach(function(s){s.classList.remove('on');s.style.display='none';});
     document.querySelectorAll('.atab').forEach(function(t){t.classList.remove('on');});
-    var p=document.getElementById('adm-inv-mgr');if(p)p.classList.add('on');
+    var p=document.getElementById('adm-inv-mgr');
+    if(p){p.classList.add('on');p.style.display='';}
     if(el)el.classList.add('on');invReload();
   } else {if(_origSAT)_origSAT.apply(this,arguments);}
 };
