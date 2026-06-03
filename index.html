@@ -1483,6 +1483,25 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
         </div>
       </div>
 
+      <!-- ย้ายข้อมูลเก่า -->
+      <div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:8px">📦 ย้ายข้อมูลเก่าเข้า Archive</div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+          <div style="font-size:12px;color:var(--mu)">ย้ายข้อมูลที่เก่ากว่า</div>
+          <select id="archYearsOld" style="min-width:90px;font-size:13px">
+            <option value="1">1 ปี</option>
+            <option value="2">2 ปี</option>
+            <option value="3" selected>3 ปี</option>
+            <option value="4">4 ปี</option>
+            <option value="5">5 ปี</option>
+          </select>
+          <div style="font-size:12px;color:var(--mu)">เฉพาะสถานะ RETURNED / CANCELLED</div>
+          <button class="btn badm sm" id="archMoveBtn" onclick="runArchiveMove()">🗄 ย้ายข้อมูล</button>
+        </div>
+        <div id="archMoveResult" style="margin-top:8px;font-size:12px;min-height:18px"></div>
+        <div style="margin-top:6px;font-size:11px;color:var(--mu)">⚠️ ข้อมูลจะถูกย้ายออกจากตารางหลัก แต่ยังเรียกดูได้ที่นี่ และย้อนกลับได้เสมอ</div>
+      </div>
+
       <!-- filter -->
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:10px;background:var(--s2);border-radius:8px">
         <div class="fg"><label>ปี</label>
@@ -3874,6 +3893,40 @@ var _archivePage=1;
 var _archivePageSize=50;
 var _archiveFiltered=[];
 var _archYearChartInst=null;
+
+async function runArchiveMove(){
+  var yr=parseInt(document.getElementById('archYearsOld').value)||3;
+  var cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-yr);
+  var cutoffStr=cutoff.toISOString().split('T')[0];
+  if(!confirm('⚠️ ยืนยันย้ายข้อมูลที่ยืมก่อน '+cutoffStr+' (เก่ากว่า '+yr+' ปี)\nสถานะ RETURNED และ CANCELLED เท่านั้น\n\nข้อมูลจะออกจากตารางหลัก แต่ยังดูได้ใน Archive'))return;
+  var btn=document.getElementById('archMoveBtn');
+  var res=document.getElementById('archMoveResult');
+  if(btn){btn.disabled=true;btn.innerHTML='⏳ กำลังย้าย...';}
+  if(res)res.innerHTML='<span style="color:var(--mu)">กำลังดำเนินการ...</span>';
+  try{
+    var resp=await fetch(SUPABASE_URL+'/rest/v1/rpc/archive_old_records',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPABASE_ANON_KEY,
+        'Authorization':'Bearer '+SUPABASE_ANON_KEY
+      },
+      body:JSON.stringify({years_old:yr})
+    });
+    var data=await resp.json();
+    if(data&&data.success){
+      if(res)res.innerHTML='<span style="color:var(--ok)">✅ ย้ายสำเร็จ — ใบยืม: <strong>'+data.loans_archived+'</strong> รายการ | บันทึก: <strong>'+data.borrows_archived+'</strong> records | cutoff: '+data.cutoff_date+'</span>';
+      await loadArchiveDash();
+      await loadAll();
+    }else{
+      if(res)res.innerHTML='<span style="color:var(--er)">❌ เกิดข้อผิดพลาด: '+(data.message||JSON.stringify(data))+'</span>';
+    }
+  }catch(e){
+    if(res)res.innerHTML='<span style="color:var(--er)">❌ เกิดข้อผิดพลาด: '+e.message+'</span>';
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='🗄 ย้ายข้อมูล';}
+  }
+}
 
 async function loadArchiveDash(){
   var wrap=document.getElementById('archTableWrap');
