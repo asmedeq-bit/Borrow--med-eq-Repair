@@ -3160,32 +3160,46 @@ async function renderSum(r){
         +'<div style="position:relative;height:'+_ucH+'px;">'
           +'<canvas id="'+_ucid+'" role="img" aria-label="Horizontal bar chart showing utilization percentage per equipment type"></canvas>'
         +'</div>'
-        +'<script>'
-          +'(function(){'
-            +'var tryDraw=function(){'
-              +'if(!window.Chart){setTimeout(tryDraw,200);return;}'
-              +'var el=document.getElementById("'+_ucid+'");if(!el)return;'
-              +'new window.Chart(el,{'
-                +'type:"bar",'
-                +'data:{'
-                  +'labels:'+JSON.stringify(_ucLabels)+','
-                  +'datasets:[{label:"Utilization %",data:'+JSON.stringify(_ucVals)+','
-                    +'backgroundColor:'+JSON.stringify(_ucColors)+','
-                    +'borderRadius:4,borderSkipped:false}]'
-                +'},'
-                +'options:{'
-                  +'indexAxis:"y",responsive:true,maintainAspectRatio:false,'
-                  +'plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.parsed.x.toFixed(1)+"%";}}}},'
-                  +'scales:{'
-                    +'x:{min:0,max:100,ticks:{callback:function(v){return v+"%";},font:{size:11}},grid:{color:"rgba(128,128,128,0.1)"}},'
-                    +'y:{ticks:{font:{size:11}},grid:{display:false}}'
-                  +'}'
-                +'}'
-              +'});'
-            +'};tryDraw();'
-          +'})();'
-        +'<\/script>'
       +'</div>';
+    // ── draw chart หลัง DOM render (setTimeout แทน script tag) ──
+    var _ucLabelsSnap=_ucLabels.slice();
+    var _ucValsSnap=_ucVals.slice();
+    var _ucColorsSnap=_ucColors.slice();
+    var _ucidSnap=_ucid;
+    setTimeout(function(){
+      var el=document.getElementById(_ucidSnap);
+      if(!el)return;
+      if(!window.Chart){setTimeout(arguments.callee,200);return;}
+      // destroy existing chart if any
+      if(el._chartInst){el._chartInst.destroy();}
+      el._chartInst=new window.Chart(el,{
+        type:'bar',
+        data:{
+          labels:_ucLabelsSnap,
+          datasets:[{
+            label:'Utilization %',
+            data:_ucValsSnap,
+            backgroundColor:_ucColorsSnap,
+            borderRadius:4,
+            borderSkipped:false
+          }]
+        },
+        options:{
+          indexAxis:'y',
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{
+            legend:{display:false},
+            tooltip:{callbacks:{label:function(ctx){return ' '+ctx.parsed.x.toFixed(1)+'%';}}}
+          },
+          scales:{
+            x:{min:0,max:100,ticks:{callback:function(v){return v+'%';},font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},
+            y:{ticks:{font:{size:11}},grid:{display:false}}
+          }
+        }
+      });
+    },300);
+    avgHtml+='';//dummy to avoid JS parse issue
   }
 
 
