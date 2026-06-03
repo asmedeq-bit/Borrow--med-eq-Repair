@@ -3098,7 +3098,7 @@ async function renderSum(r){
     var ma7S=last7.length>0?(last7.reduce(function(s,d){return s+(dayData[d]||0);},0)/last7.length).toFixed(2):'0.00';
     var trendS=parseFloat(ma7S)>parseFloat(avgS)?'up':parseFloat(ma7S)<parseFloat(avgS)?'down':'flat';
     var inv=_invFull[n.toLowerCase()]||{total:0,active:0,inactive:0,forDept:0};
-    var utilPct=inv.active>0?parseFloat((todayVal/inv.active*100).toFixed(1)):null;
+    var utilPct=inv.active>0?parseFloat((parseFloat(avgS)/inv.active*100).toFixed(1)):null;
     var availableNow=Math.max(0,(inv.active||0)-todayVal);
     var col=BAR_COLORS2[i%BAR_COLORS2.length];
     return{name:n,avg:avgS,peak:peakS,todayVal:todayVal,ma7:ma7S,
@@ -3182,24 +3182,6 @@ async function renderSum(r){
 
     // ── กราฟ Utilization % (ไม่มีตารางเก่า) ──
     avgHtml='<div class="card">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">'
-        +'<div>'
-          +'<div class="ctitle" style="margin:0;margin-bottom:2px">📈 ค่าเฉลี่ย On Loan รายวัน'
-            +'<span style="font-size:11px;color:var(--mu);font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px">'+_avgRangeLabel+'</span></div>'
-          +'<div style="font-size:11px;color:var(--mu)">ข้อมูลจากหน้า Dashboard — บันทึกอัตโนมัติทุกวัน 23:59 น. Bangkok</div>'
-        +'</div>'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-          +'<span style="font-size:11px;font-weight:700;color:'+_snapBadgeColor+'">'+_snapSource+'</span>'
-          +'<span style="color:var(--ac);font-family:var(--mo);font-size:11px">'+_bkkDate+' '+_bkkTime+'</span>'
-          +'<span style="font-size:10px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:1px 8px;color:var(--ok)">🔄 realtime</span>'
-        +'</div>'
-      +'</div>'
-      +summaryHtml
-      +'<div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-radius:6px;font-size:11px;color:var(--mu);line-height:1.8">'
-        +'💡 <strong style="color:var(--ac)">AVG</strong> = ผลรวม On Loan แต่ละวัน ÷ จำนวนวันที่มีข้อมูล'
-        +' &nbsp;|&nbsp; <strong style="color:var(--wn)">Utilization</strong> = AVG On Loan ÷ Active × 100'
-        +' &nbsp;|&nbsp; <strong style="color:var(--ok)">Available</strong> = Active − On Loan (วันนี้)'
-      +'</div>'
       // ── สรุปภาพรวม Snapshot (แบบ card+table+bar) ──
       +(function(){
         // ── คำนวณค่า summary ──
