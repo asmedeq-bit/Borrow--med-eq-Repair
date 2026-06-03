@@ -3208,87 +3208,130 @@ async function renderSum(r){
         +' &nbsp;|&nbsp; <strong style="color:var(--wn)">Utilization</strong> = AVG On Loan ÷ Active × 100'
         +' &nbsp;|&nbsp; <strong style="color:var(--ok)">Available</strong> = Active − On Loan (วันนี้)'
       +'</div>'
-      // ── ตาราง Utilization AVG/Active รายละเอียด ──
+      // ── สรุปภาพรวม Snapshot (แบบ card+table+bar) ──
       +(function(){
-        var _utilTblId='utiltbl_'+Math.random().toString(36).substr(2,6);
-        var _rows=snapStats.map(function(e){
-          var trendTxt=e.trend==='up'?'<span style="color:var(--er);font-weight:700">▲ เพิ่ม</span>':e.trend==='down'?'<span style="color:var(--ok);font-weight:700">▼ ลด</span>':'<span style="color:var(--mu)">─ คงที่</span>';
-          // utilization %
+        // ── คำนวณค่า summary ──
+        var _snapDates=[];
+        snapStats.forEach(function(e){Object.keys(snapMap[e.name]||{}).forEach(function(d){if(_snapDates.indexOf(d)<0)_snapDates.push(d);});});
+        _snapDates.sort();
+        var _snapDayCount=_snapDates.length;
+        var _snapDateFirst=_snapDates[0]||localDateStr(now);
+        var _snapDateLast=_snapDates[_snapDates.length-1]||localDateStr(now);
+        var _totalAvgOnLoan=snapStats.reduce(function(s,e){return s+parseFloat(e.avg);},0);
+        var _utilList=snapStats.filter(function(e){return e.utilPct!==null;});
+        var _avgUtil=_utilList.length>0?(_utilList.reduce(function(s,e){return s+e.utilPct;},0)/_utilList.length).toFixed(1):null;
+        var _peakEq=snapStats.length>0?snapStats.reduce(function(a,b){return b.peak>a.peak?b:a;}):null;
+        var _totalRecords=snapStats.reduce(function(s,e){return s+e.totalDays;},0);
+
+        // ── 4 summary cards ──
+        var _cards='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">'
+          // card 1: วันที่มีข้อมูล
+          +'<div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:14px;text-align:center">'
+            +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">วันที่มีข้อมูล</div>'
+            +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--tx);line-height:1">'+_snapDayCount+'</div>'
+            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">วัน</div>'
+          +'</div>'
+          // card 2: AVG On Loan รวม
+          +'<div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:14px;text-align:center">'
+            +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">AVG On Loan รวม</div>'
+            +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--ac);line-height:1">'+_totalAvgOnLoan.toFixed(1)+'</div>'
+            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">เครื่อง/วัน</div>'
+          +'</div>'
+          // card 3: Utilization เฉลี่ย
+          +'<div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:14px;text-align:center">'
+            +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">Utilization เฉลี่ย</div>'
+            +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--wn);line-height:1">'+(_avgUtil!==null?_avgUtil:'—')+'</div>'
+            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">% ของ Active</div>'
+          +'</div>'
+          // card 4: Peak สูงสุด
+          +'<div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:14px;text-align:center">'
+            +'<div style="font-size:11px;color:var(--mu);margin-bottom:6px">สูงสุด (Peak)</div>'
+            +'<div style="font-size:28px;font-weight:700;font-family:var(--mo);color:var(--er);line-height:1">'+(_peakEq?_peakEq.peak:'—')+'</div>'
+            +'<div style="font-size:11px;color:var(--mu);margin-top:4px">'+(_peakEq?_peakEq.name:'')+'</div>'
+          +'</div>'
+        +'</div>';
+
+        // ── ตารางรายเครื่อง ──
+        var _trows=snapStats.map(function(e){
           var uPct=e.utilPct!==null?e.utilPct:null;
-          var uColor=uPct!==null?(uPct>=80?'var(--er)':uPct>=50?'var(--wn)':'var(--ok)'):'var(--mu)';
-          var uBar=uPct!==null
-            ?'<div style="display:flex;align-items:center;gap:5px">'
-              +'<div style="width:60px;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;flex-shrink:0">'
-                +'<div style="height:100%;width:'+Math.min(100,uPct)+'%;background:'+uColor+';border-radius:3px;transition:width .4s"></div>'
+          var uColor=uPct!==null?(uPct>=80?'#ef4444':uPct>=50?'#d97706':'#15803d'):'var(--mu)';
+          // bar + %
+          var uCell=uPct!==null
+            ?'<div style="display:flex;align-items:center;gap:6px">'
+                +'<div style="flex:1;max-width:90px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden">'
+                  +'<div style="height:100%;width:'+Math.min(100,uPct)+'%;background:'+uColor+';border-radius:4px"></div>'
+                +'</div>'
+                +'<span style="font-size:12px;font-weight:700;color:'+uColor+';font-family:var(--mo);white-space:nowrap">'+uPct+'%</span>'
               +'</div>'
-              +'<span style="font-size:12px;font-weight:700;color:'+uColor+';font-family:var(--mo)">'+uPct+'%</span>'
-            +'</div>'
-            :'<span style="color:var(--mu);font-size:11px">—</span>';
-          // utilization label แบบ on loan / active
-          var uLbl=uPct!==null
-            ?'<div style="font-size:9px;color:var(--mu);margin-top:2px">'+e.todayVal+'/'+(e.inv.active||'?')+'</div>'
-            :'';
-          // sparkline 14 วัน
-          var spDates=Object.keys(snapMap[e.name]||{}).sort().slice(-14);
-          var spVals=spDates.map(function(d){return(snapMap[e.name]||{})[d]||0;});
-          var spMax=Math.max.apply(null,spVals.concat([1]));
-          var spW=80,spH=28;
-          var spPts=spVals.length>1?spVals.map(function(v,i){return Math.round(i*(spW/(spVals.length-1)))+','+Math.round(spH-4-(v/spMax)*(spH-8));}).join(' '):'';
-          var spFill=spPts?spPts+' '+spW+','+(spH-1)+' 0,'+(spH-1):'';
-          var spSvg='<svg width="'+spW+'" height="'+spH+'" style="vertical-align:middle;display:block">'
-            +(spFill?'<polyline points="'+spFill+'" fill="'+e.col+'" opacity="0.13"/>':'')
-            +(spPts?'<polyline points="'+spPts+'" fill="none" stroke="'+e.col+'" stroke-width="1.8" stroke-linejoin="round"/>':'')
-            +(spVals.length>0?'<circle cx="'+Math.round((spVals.length-1)*(spW/(spVals.length-1||1)))+'" cy="'+Math.round(spH-4-(spVals[spVals.length-1]||0)/spMax*(spH-8))+'" r="2.5" fill="'+e.col+'"/>':'')
-            +'</svg>';
-          // available badge
-          var availColor=e.availableNow<=0?'var(--er)':e.availableNow<=2?'var(--wn)':'var(--ok)';
+            :'<span style="color:var(--mu)">—</span>';
+          var trendTxt=e.trend==='up'
+            ?'<span style="color:var(--er);font-weight:700;font-size:12px">▲ เพิ่ม</span>'
+            :e.trend==='down'
+              ?'<span style="color:var(--ok);font-weight:700;font-size:12px">▼ ลด</span>'
+              :'<span style="color:var(--mu);font-size:12px">─ คงที่</span>';
           return '<tr style="border-bottom:1px solid var(--bd)">'
-            +'<td style="padding:8px 10px;white-space:nowrap">'
-              +'<div style="display:flex;align-items:center;gap:7px">'
-                +'<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+e.col+';flex-shrink:0"></span>'
-                +'<strong style="font-size:13px">'+e.name+'</strong>'
-              +'</div>'
-            +'</td>'
-            +'<td style="text-align:center;font-family:var(--mo);font-size:13px;color:var(--mu)">'+parseFloat(e.ma7).toFixed(1)+'</td>'
-            +'<td style="text-align:center;font-family:var(--mo);font-size:14px;font-weight:700;color:var(--ac)">'+e.peak+'</td>'
-            +'<td style="text-align:center;padding:6px 8px">'
-              +'<div>'+uBar+'</div>'
-              +uLbl
-            +'</td>'
-            +'<td style="text-align:center;font-family:var(--mo);font-size:11px;color:var(--mu)">'+e.totalDays+'</td>'
+            +'<td style="padding:9px 10px;font-size:13px;font-weight:600">'+e.name+'</td>'
+            +'<td style="text-align:center;font-family:var(--mo);color:var(--ac);font-weight:700;font-size:14px">'+parseFloat(e.avg).toFixed(1)+'</td>'
+            +'<td style="text-align:center;font-family:var(--mo);font-size:13px;color:var(--tx)">'+e.peak+'</td>'
+            +'<td style="text-align:center;font-family:var(--mo);font-size:13px;color:var(--ok)">'+( e.inv.active||'—')+'</td>'
+            +'<td style="padding:8px 10px;min-width:150px">'+uCell+'</td>'
             +'<td style="text-align:center">'+trendTxt+'</td>'
-            +'<td style="text-align:center">'+spSvg+'</td>'
-            +'<td style="text-align:center">'
-              +'<span style="font-family:var(--mo);font-size:13px;font-weight:700;color:'+availColor+'">'+e.availableNow+'</span>'
-            +'</td>'
             +'</tr>';
         }).join('');
-        return '<div style="margin-top:14px">'
-          +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
-            +'<div style="font-size:12px;font-weight:700;color:var(--tx)">📊 ร้อยละการใช้งานเครื่องมือแต่ละรายการ (UTILIZATION AVG/ACTIVE)</div>'
-            +'<button class="btn bg sm" onclick="(function(){var t=document.getElementById(\''+_utilTblId+'\');t.style.display=t.style.display===\'none\'?\'\':\'none\';})()" style="font-size:11px">▼ แสดง/ซ่อน</button>'
-          +'</div>'
-          +'<div id="'+_utilTblId+'">'
-            +'<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mu);margin-bottom:8px;padding:6px 10px;background:var(--s2);border-radius:6px">'
-              +'<span><span style="color:var(--er);font-weight:700">■</span> &gt;80% สูง — ใกล้เต็ม</span>'
-              +'<span><span style="color:var(--wn);font-weight:700">■</span> 50–80% ปานกลาง</span>'
-              +'<span><span style="color:var(--ok);font-weight:700">■</span> &lt;50% ต่ำ — มีสำรองเพียงพอ</span>'
-              +'<span style="margin-left:auto">Utilization = On Loan วันนี้ ÷ Active × 100</span>'
+
+        // ── กราฟแท่ง Utilization % ──
+        var _barId='snapbar_'+Math.random().toString(36).substr(2,6);
+        var _barData=snapStats.filter(function(e){return e.utilPct!==null;});
+        var _barLabels=_barData.map(function(e){return e.name.length>14?e.name.substr(0,13)+'…':e.name;});
+        var _barVals=_barData.map(function(e){return e.utilPct;});
+        var _barColors=_barVals.map(function(v){return v>=80?'rgba(239,68,68,.85)':v>=50?'rgba(180,120,0,.85)':'rgba(34,100,34,.85)';});
+        var _barH=Math.max(220,_barData.length*52+80);
+
+        // schedule chart draw
+        window._ucDrawPending=window._ucDrawPending||{};
+        window._ucDrawPending[_barId]={
+          labels:_barLabels,vals:_barVals,colors:_barColors,isVertical:true
+        };
+
+        return '<div style="margin-top:18px;background:var(--s1);border:1px solid var(--bd);border-radius:10px;overflow:hidden">'
+          // header
+          +'<div style="padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+            +'<div>'
+              +'<div style="font-size:13px;font-weight:700;color:var(--tx)">📊 สรุปภาพรวม Snapshot</div>'
+              +'<div style="font-size:11px;color:var(--mu);margin-top:2px">'+_snapDateFirst+' ถึง '+_snapDateLast+' &nbsp;·&nbsp; ข้อมูล '+_snapDayCount+' วัน — '+_totalRecords+' records จาก daily_snapshots</div>'
             +'</div>'
-            +'<div style="overflow-x:auto">'
-              +'<table class="dt" style="min-width:560px">'
+          +'</div>'
+          // body
+          +'<div style="padding:14px 16px">'
+            +_cards
+            // ตาราง
+            +'<div style="overflow-x:auto;margin-bottom:16px">'
+              +'<table class="dt" style="min-width:500px">'
                 +'<thead><tr>'
                   +'<th style="text-align:left">เครื่องมือ</th>'
-                  +'<th style="text-align:center;white-space:nowrap">MA7<br><span style="color:var(--mu);font-weight:400">(เฉลี่ย 7 วัน)</span></th>'
-                  +'<th style="text-align:center">PEAK</th>'
-                  +'<th style="text-align:center;min-width:120px">UTILIZATION<br><span style="color:var(--mu);font-weight:400">AVG/ACTIVE</span></th>'
-                  +'<th style="text-align:center;white-space:nowrap">วันที่มีข้อมูล</th>'
-                  +'<th style="text-align:center;white-space:nowrap">แนวโน้ม (14วัน)</th>'
-                  +'<th style="text-align:center;min-width:90px">กราฟ (14วัน)</th>'
-                  +'<th style="text-align:center;white-space:nowrap">Available<br><span style="color:var(--mu);font-weight:400">(วันนี้)</span></th>'
+                  +'<th style="text-align:center">AVG/วัน</th>'
+                  +'<th style="text-align:center">Peak</th>'
+                  +'<th style="text-align:center">Active</th>'
+                  +'<th style="text-align:left;min-width:160px">Utilization % (AVG/Active)</th>'
+                  +'<th style="text-align:center">แนวโน้ม</th>'
                 +'</tr></thead>'
-                +'<tbody>'+_rows+'</tbody>'
+                +'<tbody>'+_trows+'</tbody>'
               +'</table>'
+            +'</div>'
+            // legend
+            +'<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--mu);margin-bottom:14px;padding:8px 12px;background:var(--s2);border-radius:6px;line-height:1.8">'
+              +'<span><span style="color:#ef4444;font-weight:700">Utilization สูง (&gt;80%)</span> — เครื่องใกล้เต็ม ควรติดตาม</span>'
+              +'<span style="color:var(--bd)">|</span>'
+              +'<span><span style="color:#d97706;font-weight:700">ปานกลาง (50–80%)</span> — ใช้งานปกติ</span>'
+              +'<span style="color:var(--bd)">|</span>'
+              +'<span><span style="color:#15803d;font-weight:700">ต่ำ (&lt;50%)</span> — มีเครื่องสำรองเพียงพอ</span>'
+              +'<span style="color:var(--bd)">|</span>'
+              +'<span>Utilization = AVG On Loan ÷ Active × 100</span>'
+            +'</div>'
+            // กราฟแท่ง vertical
+            +'<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">กราฟ Utilization % แยกรายเครื่องมือ</div>'
+            +'<div style="position:relative;height:'+_barH+'px">'
+              +'<canvas id="'+_barId+'" role="img" aria-label="Bar chart utilization per equipment"></canvas>'
             +'</div>'
           +'</div>'
         +'</div>';
@@ -3772,19 +3815,16 @@ async function renderSum(r){
         if(!window.Chart){allDone=false;return;}
         var d=_pending[_id];
         if(el._chartInst){try{el._chartInst.destroy();}catch(e){}}
+        var _isVert=d.isVertical===true;
         el._chartInst=new window.Chart(el,{
           type:'bar',
-          data:{
-            labels:d.labels,
-            datasets:[{label:'Utilization %',data:d.vals,backgroundColor:d.colors,borderRadius:4,borderSkipped:false}]
-          },
+          data:{labels:d.labels,datasets:[{label:'Utilization %',data:d.vals,backgroundColor:d.colors,borderRadius:5,borderSkipped:false}]},
           options:{
-            indexAxis:'y',responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return' '+ctx.parsed.x.toFixed(1)+'%';}}}},
-            scales:{
-              x:{min:0,max:100,ticks:{callback:function(v){return v+'%';},font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},
-              y:{ticks:{font:{size:11}},grid:{display:false}}
-            }
+            indexAxis:_isVert?'x':'y',responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return' '+((_isVert?ctx.parsed.y:ctx.parsed.x)||0).toFixed(1)+'%';}}}},
+            scales:_isVert
+              ?{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';},font:{size:10},color:'#8b949e'},grid:{color:'rgba(128,128,128,0.1)'}},x:{ticks:{font:{size:10},color:'#8b949e',maxRotation:30},grid:{display:false}}}
+              :{x:{min:0,max:100,ticks:{callback:function(v){return v+'%';},font:{size:11}},grid:{color:'rgba(128,128,128,0.1)'}},y:{ticks:{font:{size:11}},grid:{display:false}}}
           }
         });
       });
