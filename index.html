@@ -3805,7 +3805,7 @@ async function renderSum(r){
   var _pendingCharts=window._ucDrawPending||{};
   window._ucDrawPending={};
 
-  sc.innerHTML=chartHtml+dayTableHtml+_hfncSetHtml+origHtml+allLoansHtml;
+  sc.innerHTML=chartHtml+dayTableHtml+avgHtml+_hfncSetHtml+origHtml+allLoansHtml;
 
   // ── draw utilization charts หลัง innerHTML set เสร็จ (canvas อยู่ใน DOM แล้ว) ──
   if(Object.keys(_pendingCharts).length>0){
