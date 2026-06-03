@@ -489,6 +489,7 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   animation:fadeUp .5s ease both;
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
 
@@ -2161,7 +2162,7 @@ var API = {
 var _DEPTS_DEFAULT=[{c:'0001',n:'ER'},{c:'0002',n:'100/9'},{c:'0003',n:'100/6'},{c:'0004',n:'80/10'},{c:'0005',n:'80/9'},{c:'0006',n:'80/8'},{c:'0007',n:'ศช'},{c:'0008',n:'ศญ'},{c:'0009',n:'80/5'},{c:'0010',n:'80/2'},{c:'0011',n:'PICU'},{c:'0012',n:'80/1'},{c:'0013',n:'14/9.'},{c:'0014',n:'14/8.'},{c:'0015',n:'14/7.'},{c:'0016',n:'อญ'},{c:'0017',n:'อช'},{c:'0018',n:'CICU'},{c:'0019',n:'SICU'},{c:'0020',n:'MICU'},{c:'0021',n:'OPD MED'},{c:'0022',n:'OPD SURG'},{c:'0023',n:'แผนกไตเทียม'},{c:'0024',n:'วิสัญญี'},{c:'0025',n:'OR'},{c:'0026',n:'ห้องตรวจพิเศษศัลย์'},{c:'0027',n:'MIS'},{c:'0028',n:'กายภาพ'},{c:'0029',n:'ห้อง Intervention'},{c:'0030',n:'รังสี'},{c:'0031',n:'OPD chest'},{c:'0032',n:'OPD ortho'},{c:'0033',n:'OPD กุมาร'},{c:'0034',n:'OPD ตา'},{c:'0035',n:'OPD ENT'},{c:'0036',n:'OPD Uro'},{c:'0037',n:'ศูนย์สมองฯ'},{c:'0038',n:'ศูนย์แพทย์'},{c:'9999',n:'อื่นๆ'}];
 var _EQL_DEFAULT=['Ventilator','Ventilator transfer','HFNC','HFNC transfer','BiPAP','BIRD','Infusion pump','Infusion pump for chemo','Syringe pump','PCA','Enteral feeding pump','Oxygen flow meter pipeline','Oxygen flow meter regulator','Continuous suction pipeline','Intermittent suction pipeline','thoracic suction pipeline','PEEP VALVE','CPAP VALVE','Heated probe humidifier','อื่นๆ'];
 var _EQNUMS_DEFAULT=['O2FLO1','O2FLO2','O2FLO3','MEK1','MEK2','MEK3','MEK5'];
-var _RETREMARKS_DEFAULT=['OFF','Intubation','Extubation','คืนเครื่องแล้วไม่ได้ลงคืนในระบบ/ลงคืนในระบบวันนี้/วันคืนจริง NA','ย้ายไปหน่วยวิกฤต SICU','ย้ายไปหน่วยวิกฤต MICU','ย้ายไปหน่วยวิกฤต CICU','ย้ายไปหน่วยวิกฤต PICU','ครบเปลี่ยน','DEAD','เครื่องมืออุปกรณ์ชำรุดขัดข้อง','ไม่ได้ใช้งาน','NA','อื่นๆ'];
+var _RETREMARKS_DEFAULT=['OFF','ย้ายไปหน่วยวิกฤต','DEAD','เครื่องมืออุปกรณ์ชำรุดขัดข้อง','ไม่ได้ใช้งาน','NA','อื่นๆ'];
 var _ACCS_DEFAULT=[{id:'a1',n:'Oxygen flow meter pipeline with power take off',no:true},{id:'a2',n:'Oxygen flow meter pipeline 70 LPM',no:true},{id:'a3',n:'Self inflating bag',no:false},{id:'a4',n:'full face mask',det:true},{id:'a5',n:'Nasal cannula HFNC',no:true},{id:'a6',n:'อื่นๆ',det:true}];
 var _STAFF_DEFAULT=['ร.อ.วรชาติ','ร.อ. ประสิทธิ์','น.ต.วิทยา','พ.จ.อ.หญิง วนิดา','น.ต.หญิง นวิยา','น.ท.หญิง สุชาดา','น.ส.นิภาวรรณ','น.ส. ประนอม','อื่นๆ'];
 
@@ -2998,7 +2999,7 @@ async function renderSum(r){
       _invFull[n.toLowerCase()]={
         name:n,
         total:eq.total||0,
-        active:Math.max(0,(eq.total||0)-(eq.inactive||0)),
+        active:Math.max(0,(eq.total||0)-(eq.inactive||0)-(eq.forDept||0)),
         inactive:eq.inactive||0,
         forDept:eq.forDept||0
       };
@@ -3026,7 +3027,7 @@ async function renderSum(r){
     var trendS=parseFloat(ma7S)>parseFloat(avgS)?'up':parseFloat(ma7S)<parseFloat(avgS)?'down':'flat';
     var inv=_invFull[n.toLowerCase()]||{total:0,active:0,inactive:0,forDept:0};
     var utilPct=inv.active>0?parseFloat((todayVal/inv.active*100).toFixed(1)):null;
-    var availableNow=Math.max(0,(inv.active||0)-(inv.forDept||0)-todayVal);
+    var availableNow=Math.max(0,(inv.active||0)-todayVal);
     var col=BAR_COLORS2[i%BAR_COLORS2.length];
     return{name:n,avg:avgS,peak:peakS,todayVal:todayVal,ma7:ma7S,
            sumActive:sumActiveS,totalDays:totalDaysS,trend:trendS,
@@ -3043,6 +3044,8 @@ async function renderSum(r){
   if(snapStats.length===0){
     avgHtml='<div class="card"><div class="ctitle">📈 ค่าเฉลี่ย On Loan รายวัน (Dashboard)</div>'      +'<div style="text-align:center;padding:30px;color:var(--mu)">ไม่มีข้อมูล — '      +'<a href="backfill_180.html" target="_blank" style="color:var(--ac)">คลิกเพื่อสร้างข้อมูลย้อนหลัง</a></div></div>';
   }else{
+    // ── Utilization chart id unique ──
+    var _ucid='uc_'+Math.random().toString(36).substr(2,6);
     // summary cards
     var totalOnLoanToday=snapStats.reduce(function(s,e){return s+e.todayVal;},0);
     var totalAvg=snapStats.reduce(function(s,e){return s+parseFloat(e.avg);},0).toFixed(1);
@@ -3071,7 +3074,118 @@ async function renderSum(r){
       return'<tr class="avg-tbl-row" style="border-bottom:1px solid var(--bd)">'        +'<td style="padding:8px 10px"><div style="display:flex;align-items:center;gap:7px">'          +'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+e.col+';flex-shrink:0"></span>'          +'<strong>'+e.name+'</strong>'          +'<span style="font-size:10px;color:'+trendC+'">'+trendTxt+'</span>'        +'</div></td>'        +'<td style="text-align:center;font-family:var(--mo);color:var(--mu)">'+( e.inv.total||'—')+'</td>'        +'<td style="text-align:center;font-family:var(--mo);color:var(--ok);font-weight:700">'+( e.inv.active||'—')+'</td>'        +'<td style="text-align:center;font-family:var(--mo);color:var(--er)">'+( e.inv.inactive||0)+'</td>'        +'<td style="text-align:center;font-family:var(--mo);color:var(--wn)">'+( e.inv.forDept||0)+'</td>'        +'<td style="text-align:center;font-family:var(--mo);font-weight:700;font-size:15px;color:var(--ac)">'+e.todayVal+'</td>'        +'<td style="text-align:center;font-family:var(--mo);color:var(--ok)">'+e.availableNow+'</td>'        +'<td style="text-align:center;font-family:var(--mo);font-weight:700;font-size:15px;color:var(--ac)">'+e.avg+'</td>'        +'<td style="text-align:center;font-family:var(--mo);color:'+(parseFloat(e.ma7)>parseFloat(e.avg)?'var(--er)':parseFloat(e.ma7)<parseFloat(e.avg)?'var(--ok)':'var(--ac2)')+'">'+e.ma7+'</td>'        +'<td style="text-align:center;font-family:var(--mo);color:var(--wn)">'+e.peak+'</td>'        +'<td style="text-align:center;padding:6px 8px">'+utilCell+'</td>'        +'<td style="text-align:center;font-family:var(--mo);color:var(--mu);font-size:11px">'+e.totalDays+'</td>'        +'<td style="text-align:center">'+spSvg+'</td>'        +'<td style="text-align:center"><button class="abt svb" data-key="'+ak+'" style="border-color:var(--ac);color:var(--ac);font-size:11px">ดู</button></td>'        +'</tr>';
     }).join('');
 
-    avgHtml='<div class="card">'      +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">'        +'<div>'          +'<div class="ctitle" style="margin:0;margin-bottom:2px">📈 ค่าเฉลี่ย On Loan รายวัน'            +'<span style="font-size:11px;color:var(--mu);font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px">'+_avgRangeLabel+'</span></div>'          +'<div style="font-size:11px;color:var(--mu)">ข้อมูลจากหน้า Dashboard — บันทึกอัตโนมัติทุกวัน 23:59 น. Bangkok</div>'        +'</div>'        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'          +'<span style="font-size:11px;font-weight:700;color:'+_snapBadgeColor+'">'+_snapSource+'</span>'          +'<span style="color:var(--ac);font-family:var(--mo);font-size:11px">'+_bkkDate+' '+_bkkTime+'</span>'          +'<span style="font-size:10px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:1px 8px;color:var(--ok)">🔄 realtime</span>'        +'</div>'      +'</div>'      +summaryHtml      +'<div style="overflow-x:auto"><table class="dt" style="min-width:900px">'        +'<thead><tr style="background:var(--s2)">'          +'<th style="text-align:left;min-width:160px;font-size:11px">MEDICAL EQUIPMENT</th>'          +'<th style="text-align:center;font-size:11px">Total</th>'          +'<th style="text-align:center;font-size:11px;color:var(--ok)">Active<br>% of Total</th>'          +'<th style="text-align:center;font-size:11px;color:var(--er)">Inactive</th>'          +'<th style="text-align:center;font-size:11px;color:var(--wn)">For Dept Use</th>'          +'<th style="text-align:center;font-size:11px;color:var(--ac)">On Loan<br>วันนี้</th>'          +'<th style="text-align:center;font-size:11px;color:var(--ok)">Available<br>วันนี้</th>'          +'<th style="text-align:center;font-size:11px;color:var(--ac)">AVG On Loan<br><span style="font-weight:400">เครื่อง/วัน</span></th>'          +'<th style="text-align:center;font-size:11px;color:var(--ac2)">MA7</th>'          +'<th style="text-align:center;font-size:11px;color:var(--wn)">Peak</th>'          +'<th style="text-align:center;font-size:11px">Utilization<br><span style="font-weight:400">On Loan/Active</span></th>'          +'<th style="text-align:center;font-size:11px">วันที่มีข้อมูล</th>'          +'<th style="text-align:center;font-size:11px">แนวโน้ม (14วัน)</th>'          +'<th style="width:36px"></th>'        +'</tr></thead>'        +'<tbody>'+tableRowsS+'</tbody>'      +'</table></div>'      +'<div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-radius:6px;font-size:11px;color:var(--mu);line-height:1.8">'        +'💡 <strong style="color:var(--ac)">AVG</strong> = ผลรวม On Loan แต่ละวัน ÷ จำนวนวันที่มีข้อมูล'        +' &nbsp;|&nbsp; <strong style="color:var(--ac2)">MA7</strong> = เฉลี่ย 7 วันล่าสุด (▲ เพิ่ม / ▼ ลด)'        +' &nbsp;|&nbsp; <strong style="color:var(--ok)">Available</strong> = Active − For Dept Use − On Loan (วันนี้)'        +' &nbsp;|&nbsp; ข้อมูล Total/Active/Inactive/ForDept จาก Admin → จัดการสถานะเครื่องมือ'      +'</div>'      +'</div>';
+    // ── Utilization summary ──
+    var totalUtil=snapStats.filter(function(e){return e.utilPct!==null;});
+    var avgUtil=totalUtil.length>0?(totalUtil.reduce(function(s,e){return s+e.utilPct;},0)/totalUtil.length).toFixed(1):'—';
+    var peakEq=snapStats.length>0?snapStats.reduce(function(a,b){return b.peak>a.peak?b:a;}):null;
+    // ── summary cards (เพิ่ม Utilization เฉลี่ย) ──
+    summaryHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:14px">'
+      +'<div style="background:var(--s2);border-radius:6px;padding:10px 14px;text-align:center">'
+        +'<div style="font-size:10px;color:var(--mu);margin-bottom:3px">เครื่องมือ</div>'
+        +'<div style="font-size:22px;font-weight:700;font-family:var(--mo);color:var(--tx)">'+snapStats.length+'</div>'
+        +'<div style="font-size:10px;color:var(--mu)">รายการ</div></div>'
+      +'<div style="background:rgba(0,200,255,.08);border:1px solid rgba(0,200,255,.2);border-radius:6px;padding:10px 14px;text-align:center">'
+        +'<div style="font-size:10px;color:var(--mu);margin-bottom:3px">On Loan วันนี้</div>'
+        +'<div style="font-size:22px;font-weight:700;font-family:var(--mo);color:var(--ac)">'+totalOnLoanToday+'</div>'
+        +'<div style="font-size:10px;color:var(--mu)">เครื่อง</div></div>'
+      +'<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:6px;padding:10px 14px;text-align:center">'
+        +'<div style="font-size:10px;color:var(--mu);margin-bottom:3px">AVG รวม</div>'
+        +'<div style="font-size:22px;font-weight:700;font-family:var(--mo);color:var(--ok)">'+totalAvg+'</div>'
+        +'<div style="font-size:10px;color:var(--mu)">เครื่อง/วัน</div></div>'
+      +'<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:10px 14px;text-align:center">'
+        +'<div style="font-size:10px;color:var(--mu);margin-bottom:3px">Utilization เฉลี่ย</div>'
+        +'<div style="font-size:22px;font-weight:700;font-family:var(--mo);color:var(--wn)">'+avgUtil+(avgUtil!=='—'?'%':'')+'</div>'
+        +'<div style="font-size:10px;color:var(--mu)">AVG/Active</div></div>'
+      +'<div style="background:var(--s2);border-radius:6px;padding:10px 14px;text-align:center">'
+        +'<div style="font-size:10px;color:var(--mu);margin-bottom:3px">ข้อมูลสะสม</div>'
+        +'<div style="font-size:22px;font-weight:700;font-family:var(--mo);color:var(--tx)">'+maxDays+'</div>'
+        +'<div style="font-size:10px;color:var(--mu)">วัน</div></div>'
+      +'</div>';
+
+    // ── utilization bar chart data ──
+    var _ucLabels=snapStats.filter(function(e){return e.utilPct!==null;}).map(function(e){return e.name;});
+    var _ucVals=snapStats.filter(function(e){return e.utilPct!==null;}).map(function(e){return e.utilPct;});
+    var _ucColors=_ucVals.map(function(v){return v>=80?'#E24B4A':v>=50?'#BA7517':'#3B6D11';});
+    var _ucH=Math.max(200,_ucLabels.length*38+80);
+
+    // ── ตาราง ──
+    avgHtml='<div class="card">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">'
+        +'<div>'
+          +'<div class="ctitle" style="margin:0;margin-bottom:2px">📈 ค่าเฉลี่ย On Loan รายวัน'
+            +'<span style="font-size:11px;color:var(--mu);font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px">'+_avgRangeLabel+'</span></div>'
+          +'<div style="font-size:11px;color:var(--mu)">ข้อมูลจากหน้า Dashboard — บันทึกอัตโนมัติทุกวัน 23:59 น. Bangkok</div>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+          +'<span style="font-size:11px;font-weight:700;color:'+_snapBadgeColor+'">'+_snapSource+'</span>'
+          +'<span style="color:var(--ac);font-family:var(--mo);font-size:11px">'+_bkkDate+' '+_bkkTime+'</span>'
+          +'<span style="font-size:10px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:10px;padding:1px 8px;color:var(--ok)">🔄 realtime</span>'
+        +'</div>'
+      +'</div>'
+      +summaryHtml
+      +'<div style="overflow-x:auto"><table class="dt" style="min-width:900px">'
+        +'<thead><tr style="background:var(--s2)">'
+          +'<th style="text-align:left;min-width:160px;font-size:11px">MEDICAL EQUIPMENT</th>'
+          +'<th style="text-align:center;font-size:11px">Total</th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--ok)">Active<br>% of Total</th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--er)">Inactive</th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--wn)">For Dept Use</th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--ac)">On Loan<br>วันนี้</th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--ok)">Available<br>วันนี้</th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--ac)">AVG On Loan<br><span style="font-weight:400">เครื่อง/วัน</span></th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--ac2)">MA7</th>'
+          +'<th style="text-align:center;font-size:11px;color:var(--wn)">Peak</th>'
+          +'<th style="text-align:center;font-size:11px">Utilization<br><span style="font-weight:400">AVG/Active</span></th>'
+          +'<th style="text-align:center;font-size:11px">วันที่มีข้อมูล</th>'
+          +'<th style="text-align:center;font-size:11px">แนวโน้ม (14วัน)</th>'
+          +'<th style="width:36px"></th>'
+        +'</tr></thead>'
+        +'<tbody>'+tableRowsS+'</tbody>'
+      +'</table></div>'
+      +'<div style="margin-top:10px;padding:8px 12px;background:var(--s2);border-radius:6px;font-size:11px;color:var(--mu);line-height:1.8">'
+        +'💡 <strong style="color:var(--ac)">AVG</strong> = ผลรวม On Loan แต่ละวัน ÷ จำนวนวันที่มีข้อมูล'
+        +' &nbsp;|&nbsp; <strong style="color:var(--ac2)">MA7</strong> = เฉลี่ย 7 วันล่าสุด (▲ เพิ่ม / ▼ ลด)'
+        +' &nbsp;|&nbsp; <strong style="color:var(--ok)">Available</strong> = Active − On Loan (วันนี้)'
+        +' &nbsp;|&nbsp; <strong style="color:var(--wn)">Utilization</strong> = AVG On Loan ÷ Active × 100'
+      +'</div>'
+      +'</div>'
+      // ── กราฟ Utilization % ──
+      +'<div class="card">'
+        +'<div class="ctitle" style="margin-bottom:6px">📊 ร้อยละการใช้งานเครื่องมือแต่ละรายการ (Utilization AVG/Active)</div>'
+        +'<div style="font-size:11px;color:var(--mu);margin-bottom:12px">'
+          +'<span style="color:var(--er);font-weight:700">■</span> &gt;80% สูง (ใกล้เต็ม) &nbsp;'
+          +'<span style="color:var(--wn);font-weight:700">■</span> 50–80% ปานกลาง &nbsp;'
+          +'<span style="color:var(--ok);font-weight:700">■</span> &lt;50% ต่ำ (มีสำรอง)'
+        +'</div>'
+        +'<div style="position:relative;height:'+_ucH+'px;">'
+          +'<canvas id="'+_ucid+'" role="img" aria-label="Horizontal bar chart showing utilization percentage per equipment type"></canvas>'
+        +'</div>'
+        +'<script>'
+          +'(function(){'
+            +'var tryDraw=function(){'
+              +'if(!window.Chart){setTimeout(tryDraw,200);return;}'
+              +'var el=document.getElementById("'+_ucid+'");if(!el)return;'
+              +'new window.Chart(el,{'
+                +'type:"bar",'
+                +'data:{'
+                  +'labels:'+JSON.stringify(_ucLabels)+','
+                  +'datasets:[{label:"Utilization %",data:'+JSON.stringify(_ucVals)+','
+                    +'backgroundColor:'+JSON.stringify(_ucColors)+','
+                    +'borderRadius:4,borderSkipped:false}]'
+                +'},'
+                +'options:{'
+                  +'indexAxis:"y",responsive:true,maintainAspectRatio:false,'
+                  +'plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.parsed.x.toFixed(1)+"%";}}}},'
+                  +'scales:{'
+                    +'x:{min:0,max:100,ticks:{callback:function(v){return v+"%";},font:{size:11}},grid:{color:"rgba(128,128,128,0.1)"}},'
+                    +'y:{ticks:{font:{size:11}},grid:{display:false}}'
+                  +'}'
+                +'}'
+              +'});'
+            +'};tryDraw();'
+          +'})();'
+        +'<\/script>'
+      +'</div>';
   }
 
 
