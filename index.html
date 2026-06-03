@@ -3801,19 +3801,21 @@ async function renderSum(r){
   // trigger render after DOM ready
   setTimeout(function(){if(window._renderHfncSection)window._renderHfncSection();},50);
 
-  sc.innerHTML=chartHtml+dayTableHtml+avgHtml+_hfncSetHtml+origHtml+allLoansHtml;
+  // ── รวบรวม pending charts ก่อน set innerHTML ──
+  var _pendingCharts=window._ucDrawPending||{};
+  window._ucDrawPending={};
 
-  // ── draw utilization charts หลัง innerHTML set เสร็จ ──
-  if(window._ucDrawPending){
-    var _pending=window._ucDrawPending;
-    window._ucDrawPending={};
+  sc.innerHTML=chartHtml+dayTableHtml+_hfncSetHtml+origHtml+allLoansHtml;
+
+  // ── draw utilization charts หลัง innerHTML set เสร็จ (canvas อยู่ใน DOM แล้ว) ──
+  if(Object.keys(_pendingCharts).length>0){
     var _tryDrawAll=function(){
       var allDone=true;
-      Object.keys(_pending).forEach(function(_id){
+      Object.keys(_pendingCharts).forEach(function(_id){
         var el=document.getElementById(_id);
         if(!el){allDone=false;return;}
         if(!window.Chart){allDone=false;return;}
-        var d=_pending[_id];
+        var d=_pendingCharts[_id];
         if(el._chartInst){try{el._chartInst.destroy();}catch(e){}}
         var _isVert=d.isVertical===true;
         el._chartInst=new window.Chart(el,{
@@ -3830,7 +3832,7 @@ async function renderSum(r){
       });
       if(!allDone)setTimeout(_tryDrawAll,150);
     };
-    setTimeout(_tryDrawAll,100);
+    setTimeout(_tryDrawAll,80);
   }
 
   if(sc._svh)sc.removeEventListener('click',sc._svh);
