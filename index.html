@@ -2283,7 +2283,7 @@ function startSumRealtime(){
     if(pg&&pg.classList.contains('on')){
       renderSum({}); // async — fire and forget OK for timer
     }
-  },60000); // ทุก 1 นาที
+  },300000); // ทุก 5 นาที
 }
 function stopSumRealtime(){
   if(window._sumRealtimeTimer){clearInterval(window._sumRealtimeTimer);window._sumRealtimeTimer=null;}
