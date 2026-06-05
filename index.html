@@ -2866,6 +2866,108 @@ async function renderSum(r){
   });
   var eqNames2=Object.keys(allEqNames2).sort();
   var dayList=Object.keys(dayMap).sort().reverse();
+
+  // ── day summary cards: grand + per-equipment ──────────────────────────────
+  var _daySumHtml=(function(){
+    if(dayList.length===0)return'';
+    var _dShow30=dayList.slice(0,30);
+    // คำนวณ totals จาก dayMap ทั้งหมด (ไม่จำกัด 30 วัน)
+    var _totB=0,_totR=0,_maxDayB=0,_maxDayDate='';
+    var _eqTotB={},_eqTotR={};
+    eqNames2.forEach(function(n){_eqTotB[n]=0;_eqTotR[n]=0;});
+    dayList.forEach(function(d){
+      var db=Object.values(dayMap[d].borrow).reduce(function(s,v){return s+v;},0);
+      var dr=Object.values(dayMap[d].ret).reduce(function(s,v){return s+v;},0);
+      _totB+=db;_totR+=dr;
+      if(db>_maxDayB){_maxDayB=db;_maxDayDate=d;}
+      eqNames2.forEach(function(n){_eqTotB[n]+=(dayMap[d].borrow[n]||0);_eqTotR[n]+=(dayMap[d].ret[n]||0);});
+    });
+    var _nDays=dayList.length;
+    var _avgDay=_nDays>0?(_totB/_nDays).toFixed(1):0;
+    var _pending=_totB-_totR;
+
+    // label ช่วงวันที่จาก Global Filter
+    var _gs=fDateS||'',_ge=fDateE||'';
+    var _rangeLabel=_gs&&_ge?_gs+' – '+_ge:_nDays+' วัน';
+    var _eqLabel=secDayEq||fEq||'ทุกชนิด';
+
+    // quick-range buttons เขียนค่าลง sumS/sumE แล้วเรียก renderSum
+    function _qBtn(label,days){
+      var d=new Date();d.setDate(d.getDate()-days+1);
+      var ds=d.toISOString().split('T')[0];
+      var de=new Date().toISOString().split('T')[0];
+      return'<button class="btn bg sm" style="font-size:10px;padding:2px 8px" onclick="(function(){'
+        +'var s=document.getElementById(\'sumS\'),e=document.getElementById(\'sumE\');'
+        +'if(s)s.value=\''+ds+'\';if(e)e.value=\''+de+'\';'
+        +'renderSum({});})()">'+label+'</button>';
+    }
+    function _clearBtn(){
+      return'<button class="btn bg sm" style="font-size:10px;padding:2px 8px" onclick="(function(){'
+        +'var s=document.getElementById(\'sumS\'),e=document.getElementById(\'sumE\');'
+        +'if(s)s.value=\'\';if(e)e.value=\'\';'
+        +'var eq=document.getElementById(\'secDayEq\');if(eq)eq.value=\'\';'
+        +'renderSum({});})()">✕ ล้าง</button>';
+    }
+
+    // grand card
+    var _grandHtml='<div style="background:var(--s2);border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex:1">'
+          +'<span style="font-size:13px;font-weight:700;color:var(--ac)">📅 สรุปรวม</span>'
+          +'<span style="font-size:11px;color:var(--mu)">'+_eqLabel+' · '+_rangeLabel+'</span>'
+        +'</div>'
+        +'<div style="display:flex;gap:5px;flex-wrap:wrap">'
+          +_qBtn('7 วัน',7)+_qBtn('14 วัน',14)+_qBtn('30 วัน',30)+_clearBtn()
+        +'</div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:7px">'
+        +[
+          {l:'ยืมทั้งหมด',v:_totB,c:'var(--ac)',s:'ครั้ง'},
+          {l:'คืนทั้งหมด',v:_totR,c:'var(--ok)',s:'ครั้ง'},
+          {l:'ยังไม่คืน',v:_pending,c:_pending>10?'var(--er)':'var(--wn)',s:'ครั้ง'},
+          {l:'เฉลี่ย/วัน',v:_avgDay,c:'var(--tx)',s:'ครั้ง'},
+          {l:'สูงสุด',v:_maxDayB,c:'var(--ac)',s:_maxDayDate?_maxDayDate.slice(5):''},
+        ].map(function(m){
+          return'<div style="background:var(--bg);border-radius:7px;padding:8px 10px;border:0.5px solid var(--bd);text-align:center">'
+            +'<div style="font-size:10px;color:var(--mu);margin-bottom:3px">'+m.l+'</div>'
+            +'<div style="font-size:16px;font-weight:700;font-family:var(--mo);color:'+m.c+'">'+m.v+'</div>'
+            +'<div style="font-size:9px;color:var(--mu);margin-top:1px">'+m.s+'</div>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+    +'</div>';
+
+    // eq cards — 1 card ต่อเครื่องมือ คลิก → set secDayEq แล้ว renderSum
+    var _EQ_COLORS=['#00c8ff','#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#34d399','#fbbf24','#f87171'];
+    var _eqCards='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px;margin-bottom:12px">';
+    eqNames2.forEach(function(n,i){
+      var tb=_eqTotB[n]||0,tr2=_eqTotR[n]||0;
+      var col=_EQ_COLORS[i%_EQ_COLORS.length];
+      var avg=_nDays>0?(tb/_nDays).toFixed(1):0;
+      var pend=tb-tr2;
+      var isActive=secDayEq===n;
+      var pendChip=pend>5
+        ?'<span style="background:rgba(239,68,68,.12);color:#ef4444;font-size:9px;padding:1px 5px;border-radius:10px;font-weight:600">'+pend+' ค้าง</span>'
+        :'<span style="background:var(--s2);color:var(--mu);font-size:9px;padding:1px 5px;border-radius:10px">เฉลี่ย '+avg+'/วัน</span>';
+      _eqCards+='<div onclick="(function(){'
+          +'var eq=document.getElementById(\'secDayEq\');'
+          +'if(eq){eq.value=\''+(isActive?'':n.replace(/'/g,"\\'"))+'\';}'
+          +'renderSum({});'
+        +'})()" style="background:var(--bg);border:1.5px solid '+(isActive?col:'var(--bd)')+';border-left:3px solid '+col+';border-radius:8px;padding:9px 11px;cursor:pointer;transition:border-color .12s;position:relative;overflow:hidden">'
+        +'<div style="font-size:11px;font-weight:600;color:var(--tx);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'+n+'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-end">'
+          +'<div><div style="font-size:18px;font-weight:700;font-family:var(--mo);color:'+col+'">'+tb+'</div><div style="font-size:9px;color:var(--mu)">ยืม</div></div>'
+          +'<div style="text-align:right"><div style="font-size:13px;font-weight:700;font-family:var(--mo);color:var(--mu)">'+tr2+'</div><div style="font-size:9px;color:var(--mu)">คืน</div></div>'
+        +'</div>'
+        +'<div style="margin-top:6px">'+pendChip+'</div>'
+        +(isActive?'<div style="position:absolute;top:4px;right:6px;font-size:9px;color:'+col+';font-weight:700">✓ กรองอยู่</div>':'')
+      +'</div>';
+    });
+    _eqCards+='</div>';
+
+    return _grandHtml+_eqCards;
+  })();
+
   // ── day section: bar chart + collapsible table ──
   var _dayUID='daytbl_'+Math.random().toString(36).substr(2,6);
   var dayTableHtml='<div class="card">';
@@ -3826,7 +3928,7 @@ async function renderSum(r){
   var _pendingCharts=window._ucDrawPending||{};
   window._ucDrawPending={};
 
-  sc.innerHTML=chartHtml+dayTableHtml+avgHtml+_hfncSetHtml+origHtml+allLoansHtml;
+  sc.innerHTML=chartHtml+_daySumHtml+dayTableHtml+avgHtml+_hfncSetHtml+origHtml+allLoansHtml;
 
   // ── draw utilization charts หลัง innerHTML set เสร็จ (canvas อยู่ใน DOM แล้ว) ──
   if(Object.keys(_pendingCharts).length>0){
