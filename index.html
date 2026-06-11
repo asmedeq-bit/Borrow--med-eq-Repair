@@ -710,12 +710,14 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
     </div>
     <div class="fbar" style="margin-bottom:6px">
       <div class="fg"><label>ค้นหา</label><input type="text" id="dailySearch" placeholder="หมายเลขเครื่อง, ผู้ป่วย, ผู้ให้ยืม..." oninput="renderDaily()" style="min-width:220px"></div>
-      <div class="fg"><label>ชนิดเครื่องมือ</label><select id="dailyFilter" onchange="renderDaily()" style="min-width:160px"><option value="">— ทุกชนิด —</option></select></div>
+      <div class="fg"><label>ชนิดเครื่องมือ</label><select id="dailyFilter" onchange="_dailyCardSync();renderDaily()" style="min-width:160px"><option value="">— ทุกชนิด —</option></select></div>
       <div class="fg"><label>แผนก</label><select id="dailyDept" onchange="renderDaily()" style="min-width:120px"><option value="">ทั้งแผนก</option></select></div>
       <div class="fg"><label>วันที่ยืม จาก</label><input type="date" id="dailyDateS" onchange="renderDaily()"></div>
       <div class="fg"><label>วันที่ยืม ถึง</label><input type="date" id="dailyDateE" onchange="renderDaily()"></div>
       <button class="btn bg sm" onclick="clearDailyFilter()" style="align-self:flex-end">✕ ล้าง</button>
     </div>
+    <!-- summary cards ใต้ filter -->
+    <div id="dailySumCards" style="margin-bottom:10px"></div>
   </div>
   <div id="dailyCont"><div class="lding"><div class="spin"></div> กำลังโหลด...</div></div>
 </div>
@@ -943,13 +945,14 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
           <div class="ctitle" style="margin:0;color:#f59e0b">📋 จัดการใบยืม (loan_requests)</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn badm sm" onclick="openAddLoanModal()">➕ เพิ่มใบยืมใหม่</button>
-            <button class="btn bg sm" onclick="dlPage('all','csv')">📥 Export CSV</button>
+            <button class="btn bg sm" onclick="dlAdminBoth('csv')">📥 Export CSV (ครบตาม filter)</button>
+            <button class="btn bg sm" onclick="dlAdminBoth('xlsx')">📥 Export XLS (ครบตาม filter)</button>
           </div>
         </div>
         <div class="fbar" style="margin-bottom:8px">
-          <div class="fg"><label>ค้นหา</label><input type="text" id="admLoanSearch" oninput="renderAdminLoans()" placeholder="LoanID, ชื่อ, แผนก..." style="min-width:180px"></div>
+          <div class="fg"><label>ค้นหา</label><input type="text" id="admLoanSearch" oninput="_admLoanFC()" placeholder="LoanID, ชื่อ, แผนก..." style="min-width:180px"></div>
           <div class="fg"><label>สถานะ</label>
-            <select id="admLoanStat" onchange="renderAdminLoans()">
+            <select id="admLoanStat" onchange="_admLoanFC()">
               <option value="">ทั้งหมด</option>
               <option value="PENDING">PENDING</option>
               <option value="ACTIVE">ACTIVE</option>
@@ -957,11 +960,14 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
               <option value="CANCELLED">CANCELLED</option>
             </select>
           </div>
-          <div class="fg"><label>จาก</label><input type="date" id="admLoanDateS" onchange="renderAdminLoans()"></div>
-          <div class="fg"><label>ถึง</label><input type="date" id="admLoanDateE" onchange="renderAdminLoans()"></div>
+          <div class="fg"><label>จาก</label><input type="date" id="admLoanDateS" onchange="_admLoanFC()"></div>
+          <div class="fg"><label>ถึง</label><input type="date" id="admLoanDateE" onchange="_admLoanFC()"></div>
           <button class="btn bg sm" onclick="admClearFilter('loan')">✕ ล้าง</button>
         </div>
-        <div id="admLoanCount" style="font-size:11px;color:var(--mu);margin-bottom:6px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+          <div id="admLoanCount" style="font-size:11px;color:var(--mu)"></div>
+          <div style="font-size:11px;color:var(--ok)" id="admLoanExportNote"></div>
+        </div>
         <div class="dtw">
           <table class="dt">
             <thead><tr>
@@ -971,6 +977,7 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
             <tbody id="admLoanBody"></tbody>
           </table>
         </div>
+        <div id="admLoanPager" style="margin-top:6px"></div>
         <div id="admLoanBulkBar" style="display:none" class="adm-toolbar" style="margin-top:8px">
           <span style="font-size:12px;font-weight:700;color:#f59e0b">เลือก <span id="loanSelCount">0</span> รายการ:</span>
           <button class="btn bwn sm" onclick="bulkChangeLoanStatus('PENDING')">→ PENDING</button>
@@ -988,13 +995,13 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
           <div class="ctitle" style="margin:0;color:#f59e0b">📝 จัดการบันทึกการยืม (borrow_records)</div>
           <div style="display:flex;gap:6px">
-            <button class="btn bg sm" onclick="dlAdmBorrows()">📥 Export CSV</button>
+            <button class="btn bg sm" onclick="dlAdmBorrows()">📥 Export CSV (ครบตาม filter)</button>
           </div>
         </div>
         <div class="fbar" style="margin-bottom:8px">
-          <div class="fg"><label>ค้นหา</label><input type="text" id="admBorSearch" oninput="renderAdminBorrows()" placeholder="RecordID, LoanID, หมายเลขเครื่อง..." style="min-width:200px"></div>
+          <div class="fg"><label>ค้นหา</label><input type="text" id="admBorSearch" oninput="_admBorFC()" placeholder="RecordID, LoanID, หมายเลขเครื่อง..." style="min-width:200px"></div>
           <div class="fg"><label>สถานะ</label>
-            <select id="admBorStat" onchange="renderAdminBorrows()">
+            <select id="admBorStat" onchange="_admBorFC()">
               <option value="">ทั้งหมด</option>
               <option value="ACTIVE">ACTIVE</option>
               <option value="RETURNED">RETURNED</option>
@@ -1002,13 +1009,16 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
             </select>
           </div>
           <div class="fg"><label>เครื่องมือ</label>
-            <select id="admBorEq" onchange="renderAdminBorrows()">
+            <select id="admBorEq" onchange="_admBorFC()">
               <option value="">ทุกรายการ</option>
             </select>
           </div>
           <button class="btn bg sm" onclick="admClearFilter('borrow')">✕ ล้าง</button>
         </div>
-        <div id="admBorCount" style="font-size:11px;color:var(--mu);margin-bottom:6px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+          <div id="admBorCount" style="font-size:11px;color:var(--mu)"></div>
+          <div style="font-size:11px;color:var(--ok)" id="admBorExportNote"></div>
+        </div>
         <div class="dtw">
           <table class="dt">
             <thead><tr>
@@ -1018,6 +1028,7 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
             <tbody id="admBorBody"></tbody>
           </table>
         </div>
+        <div id="admBorPager" style="margin-top:6px"></div>
         <div id="admBorBulkBar" style="display:none" class="adm-toolbar" style="margin-top:8px">
           <span style="font-size:12px;font-weight:700;color:#f59e0b">เลือก <span id="borSelCount">0</span> รายการ:</span>
           <button class="btn bok sm" onclick="bulkChangeBorStatus('ACTIVE')">→ ACTIVE</button>
@@ -2747,17 +2758,196 @@ function openReturnAcc(recID,loanID,idx){openReturn(recID,loanID,idx);var mttl=d
 function openTransfer(recID,fromDept,loanID,idx){if(!recID){toast('ไม่พบข้อมูลการยืม','error');return;}document.getElementById('trRecID').value=recID;document.getElementById('transfererSel').value='';document.getElementById('transfererOth').style.display='none';['trDeptCode','trDeptName','trDeptSearch'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('trDeptDisp').style.display='none';document.getElementById('trNote').value='โอนจาก '+fromDept;document.getElementById('trDate').value=new Date().toISOString().split('T')[0];var loan=loans.find(function(l){return S(l.LoanID)===S(loanID);});var bw=borrows?borrows.find(function(b){return S(b.RecordID)===S(recID);}):null;var trailSection=bw&&bw.TransferHistory&&bw.TransferHistory.length&&loan?'<div style="margin-top:7px">'+buildTransferTrail(loan,bw)+'</div>':'';var eq=loan?(loan.EquipmentList||[])[idx]:null;document.getElementById('trInfo').innerHTML=(eq?'🔧 <strong>'+eq.name+'</strong> | แผนกปัจจุบัน: <span style="color:var(--ac)">'+fromDept+'</span>':'')+trailSection;openM('mTransfer');}
 async function saveTransfer(){var recID=S(document.getElementById('trRecID').value);var transferer=getStaff('transferer');var toCode=S(document.getElementById('trDeptCode').value);var toDept=S(document.getElementById('trDeptName').value);var date=document.getElementById('trDate').value;var note=document.getElementById('trNote').value;if(!transferer){toast('กรุณาเลือกผู้โอน','error');return;}if(!toCode){toast('กรุณาเลือกแผนกที่โอนไป','error');return;}try{var _fromDept=S(document.getElementById('trNote').value).replace(/^โอนจาก\s*/,'');await API.transferEquipment(recID,{date,fromDept:_fromDept,toDept,toDeptCode:toCode,note,transfererName:transferer});toast('โอนสำเร็จ!');closeM('mTransfer');setTimeout(loadAll,2000);}catch(e){toast('เกิดข้อผิดพลาด: '+e.message,'error');}}
 
+// ── Daily Summary Cards ───────────────────────────────────────
+var _EQ_CARD_COLORS=['#00c8ff','#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#34d399','#fbbf24','#f87171'];
+
+function _dailyCardSync(){
+  // sync card highlight เมื่อ dropdown เปลี่ยน
+  var v=document.getElementById('dailyFilter')?document.getElementById('dailyFilter').value:'';
+  document.querySelectorAll('.dsc-card').forEach(function(el){
+    var isActive=el.dataset.eq===v&&v!=='';
+    el.style.borderWidth=isActive?'1.5px':'0.5px';
+    el.style.borderColor=isActive?el.dataset.color:'var(--bd)';
+    var tag=el.querySelector('.dsc-tag');if(tag)tag.style.display=isActive?'block':'none';
+  });
+}
+
+function renderDailySumCards(active){
+  var wrap=document.getElementById('dailySumCards');if(!wrap)return;
+  var now=new Date();
+  // คำนวณ stats แต่ละชนิด
+  var eqStats={};
+  active.forEach(function(item){
+    var n=S(item.eq.name);
+    if(!eqStats[n])eqStats[n]={cnt:0,over:0,warn:0};
+    eqStats[n].cnt++;
+    var ld=item.loan.LoanDate;
+    if(ld){var d=Math.max(0,Math.round((now-new Date(ld))/86400000));if(d>30)eqStats[n].over++;else if(d>14)eqStats[n].warn++;}
+  });
+  var eqNames=EQL.filter(function(n){return eqStats[n];});
+  if(!eqNames.length){wrap.innerHTML='';return;}
+  var totalCnt=active.length;
+  var totalOver=Object.values(eqStats).reduce(function(s,v){return s+v.over;},0);
+  var totalWarn=Object.values(eqStats).reduce(function(s,v){return s+v.warn;},0);
+  var curFilter=document.getElementById('dailyFilter')?document.getElementById('dailyFilter').value:'';
+
+  // grand bar
+  var grandHtml='<div style="display:flex;align-items:center;flex-wrap:wrap;gap:0;background:var(--s2);border-radius:8px;padding:8px 14px;margin-bottom:8px;border:0.5px solid var(--bd)">'
+    +[
+      {l:'กำลังยืมทั้งหมด', v:totalCnt, c:'var(--ac)'},
+      {l:'ชนิดเครื่องมือ',  v:eqNames.length, c:'var(--tx)'},
+      {l:'เกิน 30 วัน',     v:totalOver, c:totalOver>0?'var(--er)':'var(--mu)'},
+      {l:'15–30 วัน',        v:totalWarn, c:totalWarn>0?'var(--wn)':'var(--mu)'},
+    ].map(function(m,i){
+      return(i>0?'<div style="width:0.5px;height:32px;background:var(--bd);margin:0 12px"></div>':'')
+        +'<div style="text-align:center">'
+          +'<div style="font-size:17px;font-weight:700;font-family:var(--mo);color:'+m.c+'">'+m.v+'</div>'
+          +'<div style="font-size:10px;color:var(--mu)">'+m.l+'</div>'
+        +'</div>';
+    }).join('')
+    +'<div style="margin-left:auto;font-size:11px;color:var(--mu)">อัปเดต '+new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})+'</div>'
+  +'</div>';
+
+  // eq cards
+  var cardsHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px">'
+    +eqNames.map(function(n,i){
+      var s=eqStats[n];
+      var col=_EQ_CARD_COLORS[i%_EQ_CARD_COLORS.length];
+      var isActive=curFilter===n;
+      var overChip=s.over>0?'<span style="background:rgba(239,68,68,.12);color:#ef4444;border-radius:10px;padding:1px 5px;font-size:9px;font-weight:600">'+s.over+' เกิน 30</span>':'';
+      var warnChip=s.warn>0&&s.over===0?'<span style="background:rgba(245,158,11,.12);color:#f59e0b;border-radius:10px;padding:1px 5px;font-size:9px;font-weight:600">'+s.warn+' เกิน 14</span>':'';
+      var okChip=s.over===0&&s.warn===0?'<span style="background:rgba(16,185,129,.1);color:var(--ok);border-radius:10px;padding:1px 5px;font-size:9px;font-weight:600">ปกติ</span>':'';
+      return'<div class="dsc-card" data-eq="'+n+'" data-color="'+col+'" onclick="_dailyCardClick(\''+n.replace(/'/g,"\\'")+'\',\''+col+'\')" style="background:var(--s2);border:'+  (isActive?'1.5px solid '+col:'0.5px solid var(--bd)')+';border-left:3px solid '+col+';border-radius:8px;padding:9px 11px;cursor:pointer;position:relative;overflow:hidden">'
+        +'<div class="dsc-tag" style="display:'+(isActive?'block':'none')+';position:absolute;top:4px;right:5px;font-size:9px;color:'+col+';font-weight:700">✓</div>'
+        +'<div style="font-size:11px;font-weight:600;color:var(--tx);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'+n+'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-end">'
+          +'<div><div style="font-size:18px;font-weight:700;font-family:var(--mo);color:'+col+'">'+s.cnt+'</div><div style="font-size:9px;color:var(--mu)">เครื่อง</div></div>'
+          +'<div style="text-align:right"><div style="font-size:11px;font-weight:600;color:'+(s.over>0?'var(--er)':'var(--mu)')+'">'+s.over+'</div><div style="font-size:9px;color:var(--mu)">เกิน 30</div></div>'
+        +'</div>'
+        +'<div style="margin-top:5px;display:flex;gap:3px;flex-wrap:wrap">'+overChip+warnChip+okChip+'</div>'
+      +'</div>';
+    }).join('')
+  +'</div>';
+
+  wrap.innerHTML=grandHtml+cardsHtml;
+}
+
+window._dailyCardClick=function(name,col){
+  var df=document.getElementById('dailyFilter');if(!df)return;
+  df.value=df.value===name?'':name;
+  renderDaily();
+};
+var _dailyPages={};  // {eqName: currentPage}
+var _dailyPageSize=20;
+
+function _buildDailyRow(item,now,_dMap){
+  var ld=item.loan.LoanDate||'-';
+  var days=ld&&ld!=='-'?Math.max(0,Math.round((now-new Date(ld))/86400000)):'-';
+  var eqNo=item.borrow?S(item.borrow.EquipmentNo)||'—':'—';
+  var dayC=typeof days==='number'&&days>30?'var(--er)':typeof days==='number'&&days>14?'var(--wn)':'var(--ok)';
+  var accs=item.borrow&&Array.isArray(item.borrow.Accessories)?item.borrow.Accessories:[];
+  var dk=S(item.loan.LoanID)+'__'+item.idx+'_d';
+  _dMap[dk]=item;
+  var trailCell='<span style="color:var(--mu)">—</span>';
+  if(item.borrow&&item.borrow.TransferHistory&&item.borrow.TransferHistory.length){
+    var lt=item.borrow.TransferHistory[item.borrow.TransferHistory.length-1];
+    trailCell='<span class="badge btr" style="font-size:9px">🔄 '+item.borrow.TransferHistory.length+'x</span><div style="font-size:10px;color:var(--ac2);margin-top:2px">→ '+S(lt.toDept)+'</div>';
+  }
+  return'<tr><td style="padding:8px 11px"><span style="font-family:var(--mo);font-weight:700;font-size:14px;color:var(--ac)">'+eqNo+'</span></td>'
+    +'<td style="padding:8px 11px">'+ld+'</td>'
+    +'<td style="padding:8px 11px"><strong>'+S(item.loan.DeptName)+'</strong></td>'
+    +'<td style="padding:8px 11px">'+S(item.loan.PatientName)+'</td>'
+    +'<td style="padding:8px 11px;font-family:var(--mo);font-weight:700;color:'+dayC+';text-align:center">'+days+'</td>'
+    +'<td style="padding:8px 11px">'+S(item.borrow?item.borrow.GiverName||'-':'-')+'</td>'
+    +'<td style="padding:8px 11px">'+trailCell+'</td>'
+    +'<td style="padding:8px 11px">'+(accs.length>0?'<span style="font-size:11px;color:var(--ac2);font-weight:600">'+accs.length+' รายการ</span>':'<span style="color:var(--mu)">-</span>')+'</td>'
+    +'<td style="padding:8px 11px;text-align:center"><button class="abt dvb" data-key="'+dk+'" style="border-color:var(--ac);color:var(--ac);font-size:11px">รายละเอียด</button></td></tr>';
+}
+
+function _buildDailyPager(eqName,curPage,totalPages,total,from){
+  if(totalPages<=1)return'';
+  var to=Math.min(from+_dailyPageSize,total);
+  var btns='<button class="btn bg sm" style="padding:3px 9px" '+(curPage<=1?'disabled':'')+' onclick="_dailyGo(\''+eqName+'\','+(curPage-1)+')">◀</button>';
+  var lo=Math.max(1,curPage-1),hi=Math.min(totalPages,curPage+1);
+  if(lo>1)btns+='<button class="btn bg sm" style="padding:3px 9px" onclick="_dailyGo(\''+eqName+'\',1)">1</button>'+(lo>2?'<span style="color:var(--mu);padding:0 3px">…</span>':'');
+  for(var p=lo;p<=hi;p++)btns+='<button class="btn '+(p===curPage?'bp':'bg')+' sm" style="padding:3px 9px;'+(p===curPage?'font-weight:700':'')+'" onclick="_dailyGo(\''+eqName.replace(/'/g,"\\'")  +'\','+p+')">'+p+'</button>';
+  if(hi<totalPages)btns+=(hi<totalPages-1?'<span style="color:var(--mu);padding:0 3px">…</span>':'')+'<button class="btn bg sm" style="padding:3px 9px" onclick="_dailyGo(\''+eqName+'\','+totalPages+')">'+totalPages+'</button>';
+  btns+='<button class="btn bg sm" style="padding:3px 9px" '+(curPage>=totalPages?'disabled':'')+' onclick="_dailyGo(\''+eqName+'\','+(curPage+1)+')">▶</button>';
+  return'<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(0,0,0,.1);border-top:1px solid var(--bd);flex-wrap:wrap;gap:6px">'
+    +'<span style="font-size:11px;color:var(--mu)">แสดง '+(from+1)+'–'+to+' จาก <strong style="color:var(--tx)">'+total+'</strong> เครื่อง</span>'
+    +'<div style="display:flex;gap:3px">'+btns+'</div>'
+  +'</div>';
+}
+
+window._dailyGo=function(eqName,p){_dailyPages[eqName]=p;renderDaily();};
+
 function renderDaily(){
   var cont=document.getElementById('dailyCont');if(!cont)return;
   if(loans===null){cont.innerHTML='<div class="lding"><div class="spin"></div></div>';return;}
-  var filter=document.getElementById('dailyFilter').value;var search=(document.getElementById('dailySearch')?document.getElementById('dailySearch').value:'').toLowerCase().trim();var deptF=document.getElementById('dailyDept')?document.getElementById('dailyDept').value:'';var dateS=document.getElementById('dailyDateS')?document.getElementById('dailyDateS').value:'';var dateE=document.getElementById('dailyDateE')?document.getElementById('dailyDateE').value:'';var ts=document.getElementById('dailyTs');if(ts)ts.textContent='อัปเดต: '+new Date().toLocaleTimeString('th-TH');
-  var now=new Date();var active=expanded().filter(function(i){if(i.status!=='ACTIVE')return false;if(deptF&&S(i.loan.DeptName)!==deptF)return false;var ld=i.loan.LoanDate;if(dateS&&ld&&ld<dateS)return false;if(dateE&&ld&&ld>dateE)return false;if(search){var txt=(i.borrow?S(i.borrow.EquipmentNo):'')+' '+S(i.loan.PatientName)+' '+S(i.loan.BorrowerName)+' '+(i.borrow?S(i.borrow.GiverName||''):'')+' '+S(i.loan.DeptName)+' '+S(i.eq.name);if(!txt.toLowerCase().includes(search))return false;}return true;});
-  var grp={};active.forEach(function(item){var k=item.eq.name;if(!grp[k])grp[k]=[];grp[k].push(item);});var keys=filter?(grp[filter]?[filter]:[]):EQL.filter(function(e){return grp[e];});var _dMap={};
+  var filter=document.getElementById('dailyFilter').value;
+  var search=(document.getElementById('dailySearch')?document.getElementById('dailySearch').value:'').toLowerCase().trim();
+  var deptF=document.getElementById('dailyDept')?document.getElementById('dailyDept').value:'';
+  var dateS=document.getElementById('dailyDateS')?document.getElementById('dailyDateS').value:'';
+  var dateE=document.getElementById('dailyDateE')?document.getElementById('dailyDateE').value:'';
+  var ts=document.getElementById('dailyTs');if(ts)ts.textContent='อัปเดต: '+new Date().toLocaleTimeString('th-TH');
+  var now=new Date();
+  var active=expanded().filter(function(i){
+    if(i.status!=='ACTIVE')return false;
+    if(deptF&&S(i.loan.DeptName)!==deptF)return false;
+    var ld=i.loan.LoanDate;
+    if(dateS&&ld&&ld<dateS)return false;
+    if(dateE&&ld&&ld>dateE)return false;
+    if(search){var txt=(i.borrow?S(i.borrow.EquipmentNo):'')+' '+S(i.loan.PatientName)+' '+S(i.loan.BorrowerName)+' '+(i.borrow?S(i.borrow.GiverName||''):'')+' '+S(i.loan.DeptName)+' '+S(i.eq.name);if(!txt.toLowerCase().includes(search))return false;}
+    return true;
+  });
+  var grp={};active.forEach(function(item){var k=item.eq.name;if(!grp[k])grp[k]=[];grp[k].push(item);});
+  var keys=filter?(grp[filter]?[filter]:[]):EQL.filter(function(e){return grp[e];});
+  var _dMap={};
+  renderDailySumCards(active);
+  _dailyCardSync();
   if(!keys.length){cont.innerHTML='<div style="text-align:center;padding:50px 20px"><div style="font-size:42px;margin-bottom:9px">✅</div><div style="font-size:14px;color:var(--mu)">ไม่มีรายการกำลังยืมในขณะนี้</div></div>';return;}
-  var html=keys.map(function(eqName){var items=(grp[eqName]||[]).slice().sort(function(a,b){var an=parseInt((a.borrow?S(a.borrow.EquipmentNo):'').replace(/\D/g,''))||9999;var bn=parseInt((b.borrow?S(b.borrow.EquipmentNo):'').replace(/\D/g,''))||9999;return an-bn;});var rows=items.map(function(item){var ld=item.loan.LoanDate||'-';var days=ld&&ld!=='-'?Math.max(0,Math.round((now-new Date(ld))/86400000)):'-';var eqNo=item.borrow?S(item.borrow.EquipmentNo)||'—':'—';var dayC=typeof days==='number'&&days>30?'var(--er)':typeof days==='number'&&days>14?'var(--wn)':'var(--ok)';var accs=item.borrow&&Array.isArray(item.borrow.Accessories)?item.borrow.Accessories:[];var dk=S(item.loan.LoanID)+'__'+item.idx+'_d';_dMap[dk]=item;var trailCell='<span style="color:var(--mu)">—</span>';if(item.borrow&&item.borrow.TransferHistory&&item.borrow.TransferHistory.length){var lt=item.borrow.TransferHistory[item.borrow.TransferHistory.length-1];trailCell='<span class="badge btr" style="font-size:9px">🔄 '+item.borrow.TransferHistory.length+'x</span><div style="font-size:10px;color:var(--ac2);margin-top:2px">→ '+S(lt.toDept)+'</div>';}return'<tr><td style="padding:8px 11px"><span style="font-family:var(--mo);font-weight:700;font-size:14px;color:var(--ac)">'+eqNo+'</span></td><td style="padding:8px 11px">'+ld+'</td><td style="padding:8px 11px"><strong>'+S(item.loan.DeptName)+'</strong></td><td style="padding:8px 11px">'+S(item.loan.PatientName)+'</td><td style="padding:8px 11px;font-family:var(--mo);font-weight:700;color:'+dayC+';text-align:center">'+days+'</td><td style="padding:8px 11px">'+S(item.borrow?item.borrow.GiverName||'-':'-')+'</td><td style="padding:8px 11px">'+trailCell+'</td><td style="padding:8px 11px">'+(accs.length>0?'<span style="font-size:11px;color:var(--ac2);font-weight:600">'+accs.length+' รายการ</span>':'<span style="color:var(--mu)">-</span>')+'</td><td style="padding:8px 11px;text-align:center"><button class="abt dvb" data-key="'+dk+'" style="border-color:var(--ac);color:var(--ac);font-size:11px">รายละเอียด</button></td></tr>';}).join('');
-  return'<div class="card" style="margin-bottom:14px;padding:0;overflow:hidden"><div style="background:linear-gradient(135deg,rgba(0,200,255,.12),rgba(124,58,237,.08));border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;align-items:center;justify-content:space-between"><div style="font-size:15px;font-weight:700;color:var(--ac)">🔧 '+eqName+'</div><div style="font-family:var(--mo);font-size:20px;font-weight:700;color:var(--ac)">'+items.length+' <span style="font-size:12px;color:var(--mu)">เครื่อง</span></div></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:rgba(0,0,0,.2)"><th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">หมายเลขเครื่อง</th><th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">วันที่ยืม</th><th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">แผนก</th><th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">ชื่อผู้ป่วย</th><th style="padding:7px 11px;text-align:center;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">วันที่ใช้</th><th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">ผู้ให้ยืม</th><th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">ประวัติโอน</th><th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">อุปกรณ์ประกอบ</th><th style="padding:7px 11px;width:80px;text-align:center;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">รายละเอียด</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+
+  var html=keys.map(function(eqName){
+    var allItems=(grp[eqName]||[]).slice().sort(function(a,b){
+      var an=parseInt((a.borrow?S(a.borrow.EquipmentNo):'').replace(/\D/g,''))||9999;
+      var bn=parseInt((b.borrow?S(b.borrow.EquipmentNo):'').replace(/\D/g,''))||9999;
+      return an-bn;
+    });
+    var total=allItems.length;
+    var totalPages=Math.max(1,Math.ceil(total/_dailyPageSize));
+    if(!_dailyPages[eqName]||_dailyPages[eqName]>totalPages)_dailyPages[eqName]=1;
+    var curPage=_dailyPages[eqName];
+    var from=(curPage-1)*_dailyPageSize;
+    var pageItems=allItems.slice(from,from+_dailyPageSize);
+    var rows=pageItems.map(function(item){return _buildDailyRow(item,now,_dMap);}).join('');
+    var pager=_buildDailyPager(eqName,curPage,totalPages,total,from);
+    return'<div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">'
+      +'<div style="background:linear-gradient(135deg,rgba(0,200,255,.12),rgba(124,58,237,.08));border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;align-items:center;justify-content:space-between">'
+        +'<div style="font-size:15px;font-weight:700;color:var(--ac)">🔧 '+eqName+'</div>'
+        +'<div style="font-family:var(--mo);font-size:20px;font-weight:700;color:var(--ac)">'+total+' <span style="font-size:12px;color:var(--mu)">เครื่อง</span></div>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">'
+        +'<thead><tr style="background:rgba(0,0,0,.2)">'
+          +'<th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">หมายเลขเครื่อง</th>'
+          +'<th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">วันที่ยืม</th>'
+          +'<th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">แผนก</th>'
+          +'<th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">ชื่อผู้ป่วย</th>'
+          +'<th style="padding:7px 11px;text-align:center;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">วันที่ใช้</th>'
+          +'<th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">ผู้ให้ยืม</th>'
+          +'<th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">ประวัติโอน</th>'
+          +'<th style="padding:7px 11px;text-align:left;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">อุปกรณ์ประกอบ</th>'
+          +'<th style="padding:7px 11px;width:80px;text-align:center;font-size:10px;color:var(--mu);border-bottom:1px solid var(--bd)">รายละเอียด</th>'
+        +'</tr></thead>'
+        +'<tbody>'+rows+'</tbody>'
+      +'</table></div>'
+      +pager
+    +'</div>';
   }).join('');
-  cont.innerHTML=html;if(cont._dh)cont.removeEventListener('click',cont._dh);cont._dh=function(e){var btn=e.target.closest('.dvb');if(btn&&btn.dataset.key&&_dMap[btn.dataset.key])viewDet(S(_dMap[btn.dataset.key].loan.LoanID));};cont.addEventListener('click',cont._dh);
+
+  cont.innerHTML=html;
+  if(cont._dh)cont.removeEventListener('click',cont._dh);
+  cont._dh=function(e){var btn=e.target.closest('.dvb');if(btn&&btn.dataset.key&&_dMap[btn.dataset.key])viewDet(S(_dMap[btn.dataset.key].loan.LoanID));};
+  cont.addEventListener('click',cont._dh);
 }
 
 // ── Pagination state สำหรับหน้า all ─────────────────────────
@@ -4622,23 +4812,69 @@ function admClearFilter(type){
 }
 
 // ── RENDER ADMIN LOAN TABLE ──
-function renderAdminLoans(){
-  if(!loans)return;
-  var tbody=document.getElementById('admLoanBody');if(!tbody)return;
-  var search=(document.getElementById('admLoanSearch')||{}).value||'';search=search.toLowerCase();
+// ── Admin pagination state ────────────────────────────────────
+var _admLoanPage=1,_admLoanPageSize=20;
+var _admBorPage=1,_admBorPageSize=20;
+
+function _getAdminLoansFiltered(){
+  if(!loans)return[];
+  var search=((document.getElementById('admLoanSearch')||{}).value||'').toLowerCase();
   var stat=(document.getElementById('admLoanStat')||{}).value||'';
   var ds=(document.getElementById('admLoanDateS')||{}).value||'';
   var de=(document.getElementById('admLoanDateE')||{}).value||'';
-  var filtered=loans.filter(function(l){
+  return loans.filter(function(l){
     if(stat&&S(l.Status)!==stat)return false;
     var ld=l.LoanDate;if(ds&&ld&&ld<ds)return false;if(de&&ld&&ld>de)return false;
     var txt=S(l.LoanID)+' '+S(l.BorrowerName)+' '+S(l.DeptName)+' '+S(l.PatientName);
     return!search||txt.toLowerCase().includes(search);
   });
-  document.getElementById('admLoanCount').textContent='แสดง '+filtered.length+' จาก '+loans.length+' รายการ';
-  if(!filtered.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--mu);padding:20px">ไม่มีข้อมูล</td></tr>';return;}
+}
+
+function _getAdminBorFiltered(){
+  if(!borrows)return[];
+  var search=((document.getElementById('admBorSearch')||{}).value||'').toLowerCase();
+  var stat=(document.getElementById('admBorStat')||{}).value||'';
+  var eq=(document.getElementById('admBorEq')||{}).value||'';
+  return borrows.filter(function(b){
+    if(stat&&S(b.Status)!==stat)return false;
+    if(eq){var loanObj=loans?loans.find(function(l){return S(l.LoanID)===S(b.LoanID);}):null;var eqName=loanObj&&loanObj.EquipmentList&&loanObj.EquipmentList[b.EquipItemIndex]?loanObj.EquipmentList[b.EquipItemIndex].name:'';if(S(eqName)!==eq)return false;}
+    var txt=S(b.RecordID)+' '+S(b.LoanID)+' '+S(b.EquipmentNo)+' '+S(b.GiverName)+' '+S(b.ReceiverName);
+    return!search||txt.toLowerCase().includes(search);
+  });
+}
+
+function _admLoanFC(){_admLoanPage=1;renderAdminLoans();}
+function _admBorFC(){_admBorPage=1;renderAdminBorrows();}
+
+function _admPager(pagerId,curPage,totalPages,incFn,decFn,goFn){
+  var el=document.getElementById(pagerId);if(!el||totalPages<=1){if(el)el.innerHTML='';return;}
+  var btns='<div style="display:flex;align-items:center;gap:4px;padding:4px 0">';
+  btns+='<button class="btn bg sm" style="padding:3px 9px" '+(curPage<=1?'disabled':'')+' onclick="'+decFn+'">◀</button> ';
+  var lo=Math.max(1,curPage-2),hi=Math.min(totalPages,curPage+2);
+  if(lo>1)btns+='<button class="btn bg sm" style="padding:3px 9px" onclick="'+goFn+'(1)">1</button>'+(lo>2?'<span style="color:var(--mu);padding:0 3px">…</span>':'');
+  for(var p=lo;p<=hi;p++)btns+='<button class="btn '+(p===curPage?'bp':'bg')+' sm" style="padding:3px 9px;'+(p===curPage?'font-weight:700':'')+'" onclick="'+goFn+'('+p+')">'+p+'</button> ';
+  if(hi<totalPages)btns+=(hi<totalPages-1?'<span style="color:var(--mu);padding:0 3px">…</span>':'')+'<button class="btn bg sm" style="padding:3px 9px" onclick="'+goFn+'('+totalPages+')">'+totalPages+'</button>';
+  btns+='<button class="btn bg sm" style="padding:3px 9px" '+(curPage>=totalPages?'disabled':'')+' onclick="'+incFn+'">▶</button></div>';
+  el.innerHTML=btns;
+}
+
+function renderAdminLoans(){
+  if(!loans)return;
+  var tbody=document.getElementById('admLoanBody');if(!tbody)return;
+  var filtered=_getAdminLoansFiltered();
+  var total=filtered.length;
+  var totalPages=Math.max(1,Math.ceil(total/_admLoanPageSize));
+  if(_admLoanPage>totalPages)_admLoanPage=1;
+  var from=(_admLoanPage-1)*_admLoanPageSize;
+  var pageItems=filtered.slice(from,from+_admLoanPageSize);
+  var cEl=document.getElementById('admLoanCount');
+  if(cEl)cEl.textContent='แสดง '+(from+1)+'–'+Math.min(from+_admLoanPageSize,total)+' จาก '+total+' รายการ (ทั้งหมด '+loans.length+')';
+  var nEl=document.getElementById('admLoanExportNote');
+  if(nEl)nEl.innerHTML='<i class="ti ti-table-export" style="font-size:11px;vertical-align:-1px"></i> Export จะได้ <strong>'+total+'</strong> แถว ครบตาม filter';
+  if(!pageItems.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--mu);padding:20px">ไม่มีข้อมูล</td></tr>';
+    var pe=document.getElementById('admLoanPager');if(pe)pe.innerHTML='';return;}
   var smap={PENDING:'bp2',ACTIVE:'ba',RETURNED:'br2',CANCELLED:'bc2'};
-  tbody.innerHTML=filtered.map(function(l){
+  tbody.innerHTML=pageItems.map(function(l){
     var eqNames=(l.EquipmentList||[]).map(function(e){return e.name;}).join(', ');
     return'<tr class="edit-row">'
       +'<td><input type="checkbox" class="bulk-sel loan-chk" value="'+S(l.LoanID)+'" onchange="updateBulkBar(\'loan\')"></td>'
@@ -4655,26 +4891,27 @@ function renderAdminLoans(){
         +'<button class="abt" style="border-color:var(--er);color:var(--er);font-size:11px" onclick="admDeleteLoan(\''+S(l.LoanID)+'\')">🗑</button>'
       +'</div></td></tr>';
   }).join('');
+  _admPager('admLoanPager',_admLoanPage,totalPages,'_admLoanPage--;renderAdminLoans()','_admLoanPage++;renderAdminLoans()','(function(p){_admLoanPage=p;renderAdminLoans();})');
 }
 
-// ── RENDER ADMIN BORROW TABLE ──
 function renderAdminBorrows(){
   if(!borrows)return;
   var tbody=document.getElementById('admBorBody');if(!tbody)return;
-  var search=(document.getElementById('admBorSearch')||{}).value||'';search=search.toLowerCase();
-  var stat=(document.getElementById('admBorStat')||{}).value||'';
-  var eq=(document.getElementById('admBorEq')||{}).value||'';
-  var filtered=borrows.filter(function(b){
-    if(stat&&S(b.Status)!==stat)return false;
-    if(eq){var loanObj=loans?loans.find(function(l){return S(l.LoanID)===S(b.LoanID);}):null;var eqName=loanObj&&loanObj.EquipmentList&&loanObj.EquipmentList[b.EquipItemIndex]?loanObj.EquipmentList[b.EquipItemIndex].name:'';if(S(eqName)!==eq)return false;}
-    var txt=S(b.RecordID)+' '+S(b.LoanID)+' '+S(b.EquipmentNo)+' '+S(b.GiverName)+' '+S(b.ReceiverName);
-    return!search||txt.toLowerCase().includes(search);
-  });
-  document.getElementById('admBorCount').textContent='แสดง '+filtered.length+' จาก '+borrows.length+' รายการ';
-  if(!filtered.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--mu);padding:20px">ไม่มีข้อมูล</td></tr>';return;}
+  var filtered=_getAdminBorFiltered();
+  var total=filtered.length;
+  var totalPages=Math.max(1,Math.ceil(total/_admBorPageSize));
+  if(_admBorPage>totalPages)_admBorPage=1;
+  var from=(_admBorPage-1)*_admBorPageSize;
+  var pageItems=filtered.slice(from,from+_admBorPageSize);
+  var cEl=document.getElementById('admBorCount');
+  if(cEl)cEl.textContent='แสดง '+(from+1)+'–'+Math.min(from+_admBorPageSize,total)+' จาก '+total+' รายการ (ทั้งหมด '+borrows.length+')';
+  var nEl=document.getElementById('admBorExportNote');
+  if(nEl)nEl.innerHTML='<i class="ti ti-table-export" style="font-size:11px;vertical-align:-1px"></i> Export จะได้ <strong>'+total+'</strong> แถว ครบตาม filter';
+  if(!pageItems.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--mu);padding:20px">ไม่มีข้อมูล</td></tr>';
+    var pe=document.getElementById('admBorPager');if(pe)pe.innerHTML='';return;}
   var smap={ACTIVE:'ba',RETURNED:'br2',ACC_PENDING:'bap'};
   var getLoanEqName=function(b){var loanObj=loans?loans.find(function(l){return S(l.LoanID)===S(b.LoanID);}):null;return loanObj&&loanObj.EquipmentList&&loanObj.EquipmentList[b.EquipItemIndex]?loanObj.EquipmentList[b.EquipItemIndex].name:'?';};
-  tbody.innerHTML=filtered.map(function(b){
+  tbody.innerHTML=pageItems.map(function(b){
     return'<tr class="edit-row">'
       +'<td><input type="checkbox" class="bulk-sel bor-chk" value="'+S(b.RecordID)+'" onchange="updateBulkBar(\'borrow\')"></td>'
       +'<td style="font-family:var(--mo);font-size:10px;color:var(--ac2)">'+S(b.RecordID)+'</td>'
@@ -4690,6 +4927,36 @@ function renderAdminBorrows(){
         +'<button class="abt" style="border-color:var(--er);color:var(--er);font-size:11px" onclick="admDeleteBorrow(\''+S(b.RecordID)+'\')">🗑</button>'
       +'</div></td></tr>';
   }).join('');
+  _admPager('admBorPager',_admBorPage,totalPages,'_admBorPage--;renderAdminBorrows()','_admBorPage++;renderAdminBorrows()','(function(p){_admBorPage=p;renderAdminBorrows();})');
+}
+
+// ── Export รวม loan + borrow ตาม filter ────────────────────────
+function dlAdminBoth(fmt){
+  var lFiltered=_getAdminLoansFiltered();
+  var bFiltered=_getAdminBorFiltered();
+  if(!lFiltered.length&&!bFiltered.length){toast('ไม่มีข้อมูล','error');return;}
+  // สร้าง CSV 2 section
+  var rows=[];
+  rows.push(['=== ใบยืม (loan_requests) — '+lFiltered.length+' รายการ ===']);
+  rows.push(['LoanID','วันที่ยืม','ผู้ยืม','แผนก','ผู้ป่วย','เครื่องมือ','สถานะ']);
+  lFiltered.forEach(function(l){
+    rows.push([S(l.LoanID),S(l.LoanDate),S(l.BorrowerName),S(l.DeptName),S(l.PatientName),
+      (l.EquipmentList||[]).map(function(e){return e.name;}).join(', '),S(l.Status)]);
+  });
+  rows.push([]);
+  rows.push(['=== บันทึกการยืม (borrow_records) — '+bFiltered.length+' รายการ ===']);
+  rows.push(['RecordID','LoanID','ผู้ให้ยืม','หมายเลขเครื่อง','เครื่องมือ','วันที่คืน','ผู้รับคืน','สถานะ']);
+  var getLoanEqNameExp=function(b){var lo=loans?loans.find(function(l){return S(l.LoanID)===S(b.LoanID);}):null;return lo&&lo.EquipmentList&&lo.EquipmentList[b.EquipItemIndex]?lo.EquipmentList[b.EquipItemIndex].name:'?';};
+  bFiltered.forEach(function(b){
+    rows.push([S(b.RecordID),S(b.LoanID),S(b.GiverName||'-'),S(b.EquipmentNo||'—'),getLoanEqNameExp(b),S(b.ReturnDate||'-'),S(b.ReceiverName||'-'),S(b.Status)]);
+  });
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var dt=new Date().toISOString().split('T')[0];
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download='Admin_Export_'+dt+'.csv';
+  a.click();
+  toast('Export สำเร็จ: '+lFiltered.length+' ใบยืม + '+bFiltered.length+' บันทึก','ok');
 }
 
 // ── OPEN EDIT LOAN MODAL ──
