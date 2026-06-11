@@ -493,6 +493,105 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 </head>
 <body>
 
+<!-- ══ LOGIN SCREEN ═════════════════════════════════════════ -->
+<div id="loginOverlay" style="position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center">
+  <div style="background:var(--s2);border:1px solid var(--bd);border-radius:16px;padding:40px 36px;width:340px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:36px;margin-bottom:8px">🏥</div>
+      <div style="font-size:17px;font-weight:700;color:var(--tx);margin-bottom:4px">ระบบยืม-คืนเครื่องมือแพทย์</div>
+      <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:6px">แผนกบริการเครื่องมือและอุปกรณ์ทางการแพทย์</div>
+      <div style="font-size:11px;color:var(--mu)">กรุณาเข้าสู่ระบบ</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Username</label>
+        <input id="loginUser" type="text" autocomplete="username" placeholder="กรอก Username"
+          style="width:100%;padding:10px 14px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:14px;outline:none;transition:border-color .15s;box-sizing:border-box"
+          onfocus="this.style.borderColor='var(--ac)'" onblur="this.style.borderColor='var(--bd)'"
+          onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+      </div>
+
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Password</label>
+        <div style="position:relative">
+          <input id="loginPass" type="password" autocomplete="current-password" placeholder="กรอก Password"
+            style="width:100%;padding:10px 40px 10px 14px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:14px;outline:none;transition:border-color .15s;box-sizing:border-box"
+            onfocus="this.style.borderColor='var(--ac)'" onblur="this.style.borderColor='var(--bd)'"
+            onkeydown="if(event.key==='Enter')doLogin()">
+          <button onclick="(function(){var i=document.getElementById('loginPass');i.type=i.type==='password'?'text':'password';})()"
+            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mu);font-size:16px;padding:4px">👁</button>
+        </div>
+      </div>
+
+      <div id="loginErr" style="font-size:12px;color:var(--er);min-height:16px;text-align:center;opacity:0;transition:opacity .2s"></div>
+
+      <button onclick="doLogin()"
+        style="width:100%;padding:12px;background:var(--ac);border:none;border-radius:8px;color:#000;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .15s;margin-top:4px"
+        onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        เข้าสู่ระบบ
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@keyframes loginShake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-10px)}
+  40%{transform:translateX(10px)}
+  60%{transform:translateX(-8px)}
+  80%{transform:translateX(8px)}
+}
+</style>
+
+<script>
+(function(){
+  var CORRECT_USER='user';
+  var CORRECT_PASS='4321';
+
+  function loginShake(){
+    var box=document.querySelector('#loginOverlay > div');
+    if(!box)return;
+    box.style.animation='none';
+    box.offsetHeight;
+    box.style.animation='loginShake .4s ease';
+  }
+
+  function showLoginErr(msg){
+    var e=document.getElementById('loginErr');
+    if(!e)return;
+    e.textContent=msg;e.style.opacity='1';
+    setTimeout(function(){e.style.opacity='0';},2500);
+  }
+
+  window.doLogin=function(){
+    var u=(document.getElementById('loginUser').value||'').trim();
+    var p=(document.getElementById('loginPass').value||'');
+    if(u===CORRECT_USER&&p===CORRECT_PASS){
+      var ov=document.getElementById('loginOverlay');
+      ov.style.transition='opacity .3s';
+      ov.style.opacity='0';
+      setTimeout(function(){ov.style.display='none';},300);
+    } else {
+      loginShake();
+      showLoginErr('Username หรือ Password ไม่ถูกต้อง');
+      document.getElementById('loginPass').value='';
+      document.getElementById('loginPass').focus();
+    }
+  };
+
+  // focus username เมื่อโหลดหน้า
+  window.addEventListener('load',function(){
+    var u=document.getElementById('loginUser');
+    if(u)u.focus();
+  });
+})();
+</script>
+<!-- ══ END LOGIN SCREEN ══════════════════════════════════════ -->
+
 <div id="cfgBanner">⚠️ กรุณาตั้งค่า SUPABASE_URL และ SUPABASE_ANON_KEY ในส่วน CONFIG ด้านบนของ script ก่อนใช้งาน</div>
 
 <nav class="nav">
