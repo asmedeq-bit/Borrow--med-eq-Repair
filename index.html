@@ -2257,7 +2257,7 @@ var API = {
       :'or=(status.eq.ACTIVE,status.eq.ACC_PENDING,and(status.eq.RETURNED,return_date.gte.'+cutoffStr+'))&order=created_at.desc&limit=20000';
     var rows=await SB.get('borrow_records',query);
     return rows.map(function(r){
-      var ACC_MAP=[{id:'a1',name:'Oxygen flow meter pipeline with power take off',col:'acc1_flow_meter_pto'},{id:'a2',name:'Oxygen flow meter pipeline 70 LPM',col:'acc2_flow_meter_70'},{id:'a3',name:'Self inflating bag',col:'acc3_self_inflating'},{id:'a4',name:'full face mask',col:'acc4_full_face_mask'},{id:'a5',name:'Nasal cannula HFNC',col:'acc5_nasal_cannula'},{id:'a6',name:'อื่นๆ',col:'acc6_other'}];
+      var ACC_MAP=[{id:'a1',name:'Oxygen flow meter pipeline with power take off',col:'acc1_flow_meter_pto'},{id:'a2',name:'Oxygen flow meter pipeline 70 LPM',col:'acc2_flow_meter_70'},{id:'a3',name:'Self inflating bag',col:'acc3_self_inflating'},{id:'a4',name:'full face mask',col:'acc4_full_face_mask'},{id:'a5',name:'Nasal cannula HFNC',col:'acc5_nasal_cannula'},{id:'a7',name:'Oxygen flow meter regulator with power take off',col:'acc7_regulator_pto'},{id:'a6',name:'อื่นๆ',col:'acc6_other'}];
       var accs=[];
       ACC_MAP.forEach(function(a){var val=r[a.col]||'';if(val&&val.trim())accs.push({id:a.id,name:a.name,no:val==='✓'?'':val});});
       var retAccs=r.returned_accs;if(!Array.isArray(retAccs))retAccs=[];
@@ -2312,7 +2312,7 @@ var API = {
     }
     var dupItem=await SB.get('borrow_records','loan_id=eq.'+encodeURIComponent(loanID)+'&equip_item_index=eq.'+idx+'&status=eq.ACTIVE&limit=1');
     if(dupItem.length>0)return{success:false,duplicate:true,error:'item #'+idx+' ของ '+loanID+' ถูกบันทึกแล้ว'};
-    var ACC_ID_TO_COL={a1:'acc1_flow_meter_pto',a2:'acc2_flow_meter_70',a3:'acc3_self_inflating',a4:'acc4_full_face_mask',a5:'acc5_nasal_cannula',a6:'acc6_other'};
+    var ACC_ID_TO_COL={a1:'acc1_flow_meter_pto',a2:'acc2_flow_meter_70',a3:'acc3_self_inflating',a4:'acc4_full_face_mask',a5:'acc5_nasal_cannula',a7:'acc7_regulator_pto',a6:'acc6_other'};
     var row={loan_id:loanID,giver_name:data.giverName||'',equipment_no:eqNo,equip_item_index:idx,status:'ACTIVE'};
     (data.accessories||[]).forEach(function(a){var col=ACC_ID_TO_COL[a.id];if(col)row[col]=(a.no&&a.no.trim())?a.no:'✓';});
     var ts=new Date();row.record_id='BR-'+ts.getFullYear()+String(ts.getMonth()+1).padStart(2,'0')+String(ts.getDate()).padStart(2,'0')+'-'+Math.random().toString(36).substr(2,8).toUpperCase();
@@ -2340,10 +2340,10 @@ var API = {
 
 // ── DEFAULT DATA (overridden by localStorage if saved) ──────
 var _DEPTS_DEFAULT=[{c:'0001',n:'ER'},{c:'0002',n:'100/9'},{c:'0003',n:'100/6'},{c:'0004',n:'80/10'},{c:'0005',n:'80/9'},{c:'0006',n:'80/8'},{c:'0007',n:'ศช'},{c:'0008',n:'ศญ'},{c:'0009',n:'80/5'},{c:'0010',n:'80/2'},{c:'0011',n:'PICU'},{c:'0012',n:'80/1'},{c:'0013',n:'14/9.'},{c:'0014',n:'14/8.'},{c:'0015',n:'14/7.'},{c:'0016',n:'อญ'},{c:'0017',n:'อช'},{c:'0018',n:'CICU'},{c:'0019',n:'SICU'},{c:'0020',n:'MICU'},{c:'0021',n:'OPD MED'},{c:'0022',n:'OPD SURG'},{c:'0023',n:'แผนกไตเทียม'},{c:'0024',n:'วิสัญญี'},{c:'0025',n:'OR'},{c:'0026',n:'ห้องตรวจพิเศษศัลย์'},{c:'0027',n:'MIS'},{c:'0028',n:'กายภาพ'},{c:'0029',n:'ห้อง Intervention'},{c:'0030',n:'รังสี'},{c:'0031',n:'OPD chest'},{c:'0032',n:'OPD ortho'},{c:'0033',n:'OPD กุมาร'},{c:'0034',n:'OPD ตา'},{c:'0035',n:'OPD ENT'},{c:'0036',n:'OPD Uro'},{c:'0037',n:'ศูนย์สมองฯ'},{c:'0038',n:'ศูนย์แพทย์'},{c:'9999',n:'อื่นๆ'}];
-var _EQL_DEFAULT=['Ventilator','Ventilator transfer','HFNC','HFNC transfer','BiPAP','BIRD','Infusion pump','Infusion pump for chemo','Syringe pump','PCA','Enteral feeding pump','Oxygen flow meter pipeline','Oxygen flow meter regulator','Continuous suction pipeline','Intermittent suction pipeline','thoracic suction pipeline','PEEP VALVE','CPAP VALVE','Heated probe humidifier','อื่นๆ'];
+var _EQL_DEFAULT=['Ventilator','Ventilator transfer','HFNC','HFNC transfer','BiPAP','BIRD','Infusion pump','Infusion pump for chemo','Syringe pump','PCA','Enteral feeding pump','Oxygen flow meter pipeline','Oxygen flow meter regulator with power take off','Continuous suction pipeline','Intermittent suction pipeline','thoracic suction pipeline','PEEP VALVE','CPAP VALVE','Heated probe humidifier','อื่นๆ'];
 var _EQNUMS_DEFAULT=['O2FLO1','O2FLO2','O2FLO3','MEK1','MEK2','MEK3','MEK5'];
 var _RETREMARKS_DEFAULT=['OFF','Intubation','Extubation','คืน cannula HFNC','คืนเครื่องแล้วไม่ได้ลงคืนในระบบ/ลงคืนในระบบวันนี้/วันคืนจริง NA','ย้ายไปหน่วยวิกฤต SICU','ย้ายไปหน่วยวิกฤต MICU','ย้ายไปหน่วยวิกฤต CICU','ย้ายไปหน่วยวิกฤต PICU','ครบเปลี่ยน','DEAD','เครื่องมืออุปกรณ์ชำรุดขัดข้อง','ไม่ได้ใช้งาน','NA','อื่นๆ'];
-var _ACCS_DEFAULT=[{id:'a1',n:'Oxygen flow meter pipeline with power take off',no:true},{id:'a2',n:'Oxygen flow meter pipeline 70 LPM',no:true},{id:'a3',n:'Self inflating bag',no:false},{id:'a4',n:'full face mask',det:true},{id:'a5',n:'Nasal cannula HFNC',no:true},{id:'a6',n:'อื่นๆ',det:true}];
+var _ACCS_DEFAULT=[{id:'a1',n:'Oxygen flow meter pipeline with power take off',no:true},{id:'a2',n:'Oxygen flow meter pipeline 70 LPM',no:true},{id:'a3',n:'Self inflating bag',no:false},{id:'a4',n:'full face mask',det:true},{id:'a5',n:'Nasal cannula HFNC',no:true},{id:'a7',n:'Oxygen flow meter regulator with power take off',no:true},{id:'a6',n:'อื่นๆ',det:true}];
 var _STAFF_DEFAULT=['ร.อ.วรชาติ','ร.อ. ประสิทธิ์','น.ต.วิทยา','พ.จ.อ.หญิง วนิดา','น.ต.หญิง นวิยา','น.ท.หญิง สุชาดา','น.ส.นิภาวรรณ','น.ส. ประนอม','อื่นๆ'];
 
 function _lsGet(key,def){try{var v=localStorage.getItem('meq_'+key);return v?JSON.parse(v):def;}catch(e){return def;}}
@@ -3932,9 +3932,88 @@ async function renderSum(r){
   if(_ovEq2)overMonthLocal=overMonthLocal.filter(function(r){return(r.EquipmentList||[]).some(function(e){return S(e.name)===_ovEq2;});});
 
 
-  // ── section 2: ยืมเกิน 1 เดือน — bar chart + collapsible table ──
+  // ── section 2: ยืมเกิน 1 เดือน — bar chart + search/filter + pagination ──
+  // ── state เก็บไว้บน window เพื่อให้ฟังก์ชันภายนอกเข้าถึงได้ ──
+  window._omData = overMonthLocal.slice(); // snapshot ข้อมูลทั้งหมด (ไม่แก้ array ต้นทาง)
+  window._omPage = 1;
+  var _OM_PAGE_SIZE = 20;
   var _omUID='omtbl_'+Math.random().toString(36).substr(2,6);
+
+  // ── ฟังก์ชัน render ตาราง overdue (เรียกซ้ำได้ปลอดภัย) ──
+  window._omRenderTable = function(){
+    var tbody = document.getElementById('omTbody');
+    var pagerEl = document.getElementById('omPager');
+    var countEl = document.getElementById('omCount');
+    if(!tbody) return;
+
+    // อ่านค่า filter ปัจจุบัน
+    var q = ((document.getElementById('omSearch')||{}).value||'').toLowerCase().trim();
+    var range = ((document.getElementById('omRange')||{}).value)||'all';
+
+    // กรองข้อมูล
+    var filtered = window._omData.filter(function(row){
+      if(range==='60up' && row.days < 60) return false;
+      if(range==='31to59' && (row.days < 31 || row.days >= 60)) return false;
+      if(q){
+        var txt = (S(row.LoanID)+' '+S(row.DeptName)+' '+S(row.PatientName)).toLowerCase();
+        if(!txt.includes(q)) return false;
+      }
+      return true;
+    });
+
+    // pagination
+    var total = filtered.length;
+    var totalPages = Math.max(1, Math.ceil(total / _OM_PAGE_SIZE));
+    if(window._omPage > totalPages) window._omPage = 1;
+    var from = (window._omPage - 1) * _OM_PAGE_SIZE;
+    var pageItems = filtered.slice(from, from + _OM_PAGE_SIZE);
+
+    // render rows
+    if(!pageItems.length){
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--mu);padding:16px">ไม่พบรายการ</td></tr>';
+    } else {
+      tbody.innerHTML = pageItems.map(function(row){
+        var sk='s_'+S(row.LoanID); _sMap[sk]=row;
+        var dC = row.days>=60 ? 'var(--er)' : 'var(--wn)';
+        return '<tr>'
+          +'<td style="font-family:var(--mo);font-size:11px;color:var(--ac)">'+S(row.LoanID)+'</td>'
+          +'<td>'+row.LoanDate+'</td>'
+          +'<td><strong>'+S(row.DeptName)+'</strong></td>'
+          +'<td>'+S(row.PatientName)+'</td>'
+          +'<td>'+(row.EquipmentList||[]).map(function(e){return e.name;}).join('<br>')+'</td>'
+          +'<td style="text-align:center;font-family:var(--mo);color:var(--ac);font-size:12px">'+(row.EquipmentList||[]).map(function(e,i){return(row.EquipNoMap&&row.EquipNoMap[i])?'#'+row.EquipNoMap[i]:'-';}).join('<br>')+'</td>'
+          +'<td style="text-align:center;font-family:var(--mo);font-weight:700;color:'+dC+'">'+row.days+' วัน</td>'
+          +'<td style="text-align:center"><button class="abt svb" data-key="'+sk+'" style="border-color:var(--ac);color:var(--ac);font-size:11px">รายละเอียด</button></td>'
+          +'</tr>';
+      }).join('');
+    }
+
+    // อัปเดต count
+    if(countEl){
+      var label = q||range!=='all' ? filtered.length+' รายการ (filter)' : total+' รายการ';
+      countEl.textContent = 'แสดง '+(total?from+1:0)+'–'+Math.min(from+_OM_PAGE_SIZE,total)+' จาก '+label;
+    }
+
+    // render pager
+    if(pagerEl){
+      if(totalPages<=1){ pagerEl.innerHTML=''; return; }
+      var btns = '<button class="btn bg sm" style="padding:3px 9px" '+(window._omPage<=1?'disabled':'')+' onclick="window._omPage--;window._omRenderTable()">◀</button>';
+      var lo=Math.max(1,window._omPage-1), hi=Math.min(totalPages,window._omPage+1);
+      if(lo>1) btns+='<button class="btn bg sm" style="padding:3px 9px" onclick="window._omPage=1;window._omRenderTable()">1</button>'+(lo>2?'<span style="color:var(--mu);padding:0 3px">…</span>':'');
+      for(var p=lo;p<=hi;p++) btns+='<button class="btn '+(p===window._omPage?'bp':'bg')+' sm" style="padding:3px 9px;'+(p===window._omPage?'font-weight:700':'')+'" onclick="window._omPage='+p+';window._omRenderTable()">'+p+'</button>';
+      if(hi<totalPages) btns+=(hi<totalPages-1?'<span style="color:var(--mu);padding:0 3px">…</span>':'')+' <button class="btn bg sm" style="padding:3px 9px" onclick="window._omPage='+totalPages+';window._omRenderTable()">'+totalPages+'</button>';
+      btns+='<button class="btn bg sm" style="padding:3px 9px" '+(window._omPage>=totalPages?'disabled':'')+' onclick="window._omPage++;window._omRenderTable()">▶</button>';
+      pagerEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;flex-wrap:wrap;gap:6px">'
+        +'<span style="font-size:11px;color:var(--mu)" id="omCount"></span>'
+        +'<div style="display:flex;gap:3px">'+btns+'</div></div>';
+      // อัปเดต count ใน pager (render หลัง pagerEl set)
+      var pc=document.getElementById('omCount');
+      if(pc){ var label2=q||range!=='all'?filtered.length+' รายการ (filter)':total+' รายการ'; pc.textContent='แสดง '+(total?from+1:0)+'–'+Math.min(from+_OM_PAGE_SIZE,total)+' จาก '+label2; }
+    }
+  };
+
   (function(){
+    // ── bar chart (top 20 เหมือนเดิม) ──
     var omBars='';
     if(overMonthLocal.length>0){
       var _omMax=overMonthLocal[0].days||1;
@@ -3947,6 +4026,7 @@ async function renderSum(r){
         var col=row.days>=60?'#ef4444':'#f59e0b';
         var sk='s_'+S(row.LoanID);_sMap[sk]=row;
         var dept=S(row.DeptName).substring(0,6);
+        // คลิกแท่ง → เปิดตาราง + ไม่ reset filter
         return'<g style="cursor:pointer" onclick="(function(){var p=document.getElementById(\''+_omUID+'\');var b=document.getElementById(\''+_omUID+'_btn\');p.style.display=\'\';b.textContent=\'▲ ซ่อนตาราง\';})()"><title>'+S(row.DeptName)+' '+S(row.PatientName)+' '+row.days+' วัน</title>'
           +'<rect x="'+x+'" y="'+(8+60-hB)+'" width="'+_omBW+'" height="'+hB+'" fill="'+col+'" rx="3" opacity=".85"/>'
           +'<text x="'+(x+_omBW/2)+'" y="'+(5+60-hB)+'" text-anchor="middle" fill="'+col+'" font-size="9" font-weight="700" font-family="IBM Plex Mono,monospace">'+row.days+'</text>'
@@ -3965,23 +4045,48 @@ async function renderSum(r){
         +'<span style="color:#ef4444">🔴 ≥60 วัน</span>  <span style="color:#f59e0b">🟡 31-59 วัน</span>  <span style="color:var(--ac)">💡 คลิกแท่งเพื่อดูตาราง</span>'
         +'</div>';
     }
-    var omTable=overMonthLocal.length
-      ?'<div class="dtw"><table class="dt"><thead><tr><th>LoanID</th><th>วันที่ยืม</th><th>แผนก</th><th>ผู้ป่วย</th><th>เครื่องมือ</th><th style="text-align:center">หมายเลขเครื่อง</th><th style="text-align:center">จำนวนวัน</th><th style="text-align:center">รายละเอียด</th></tr></thead><tbody>'
-        +overMonthLocal.map(function(row){var sk='s_'+S(row.LoanID);_sMap[sk]=row;var dC=row.days>60?'var(--er)':'var(--wn)';return'<tr><td style="font-family:var(--mo);font-size:11px;color:var(--ac)">'+S(row.LoanID)+'</td><td>'+row.LoanDate+'</td><td><strong>'+S(row.DeptName)+'</strong></td><td>'+S(row.PatientName)+'</td><td>'+(row.EquipmentList||[]).map(function(e){return e.name;}).join('<br>')+'</td><td style="text-align:center;font-family:var(--mo);color:var(--ac);font-size:12px">'+(row.EquipmentList||[]).map(function(e,i){return(row.EquipNoMap&&row.EquipNoMap[i])?'#'+row.EquipNoMap[i]:'-';}).join('<br>')+'</td><td style="text-align:center;font-family:var(--mo);font-weight:700;color:'+dC+'">'+row.days+' วัน</td><td style="text-align:center"><button class="abt svb" data-key="'+sk+'" style="border-color:var(--ac);color:var(--ac);font-size:11px">รายละเอียด</button></td></tr>';}).join('')
-        +'</tbody></table></div>'
-      :'<p style="color:var(--ok);text-align:center;padding:14px">✅ ไม่มีรายการเกิน 1 เดือน</p>';
 
+    var noData = overMonthLocal.length===0;
     window._omHtml='<div class="card">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
-        +'<div class="ctitle" style="margin:0">⏰ รายการยืมเกิน 1 เดือน <span style="font-size:11px;color:'+(overMonthLocal.length>0?'var(--er)':'var(--ok)')+';font-weight:600;text-transform:none;letter-spacing:0">'+(overMonthLocal.length>0?overMonthLocal.length+' รายการ':'ปกติ')+'</span></div>'
-        +(overMonthLocal.length?'<button id="'+_omUID+'_btn" onclick="(function(){var p=document.getElementById(\''+_omUID+'\');var b=document.getElementById(\''+_omUID+'_btn\');if(p.style.display===\'none\'){p.style.display=\'\';b.textContent=\'▲ ซ่อนตาราง\';}else{p.style.display=\'none\';b.textContent=\'▼ ดูตาราง\';}})();" class="btn bg sm" style="font-size:11px">▼ ดูตาราง</button>':'')
+        +'<div class="ctitle" style="margin:0">⏰ รายการยืมเกิน 1 เดือน <span style="font-size:11px;color:'+(noData?'var(--ok)':'var(--er)')+';font-weight:600;text-transform:none;letter-spacing:0">'+(noData?'ปกติ':overMonthLocal.length+' รายการ')+'</span></div>'
+        +(!noData
+          ?'<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'
+            +'<button id="'+_omUID+'_btn" onclick="(function(){var p=document.getElementById(\''+_omUID+'\');var b=document.getElementById(\''+_omUID+'_btn\');if(p.style.display===\'none\'){p.style.display=\'\';b.textContent=\'▲ ซ่อนตาราง\';}else{p.style.display=\'none\';b.textContent=\'▼ ดูตาราง\';}})();" class="btn bg sm" style="font-size:11px">▼ ดูตาราง</button>'
+          +'</div>'
+          :'')
       +'</div>'
       +omBars
-      +'<div id="'+_omUID+'" style="display:none">'+omTable+'</div>'
+      +(!noData
+        ?'<div id="'+_omUID+'" style="display:none">'
+          // ── toolbar: search + range filter ──
+          +'<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px">'
+            +'<input type="text" id="omSearch" placeholder="🔍 ค้นหาแผนก / ผู้ป่วย / LoanID..." oninput="window._omPage=1;window._omRenderTable();" style="width:280px;font-size:12px;padding:5px 9px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--tx)">'
+            +'<select id="omRange" onchange="window._omPage=1;window._omRenderTable();" style="font-size:12px;padding:5px 8px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--tx)">'
+              +'<option value="all">ทุกช่วงวัน</option>'
+              +'<option value="60up">≥ 60 วัน</option>'
+              +'<option value="31to59">31–59 วัน</option>'
+            +'</select>'
+          +'</div>'
+          // ── ตาราง ──
+          +'<div class="dtw"><table class="dt"><thead><tr>'
+            +'<th>LoanID</th><th>วันที่ยืม</th><th>แผนก</th><th>ผู้ป่วย</th>'
+            +'<th>เครื่องมือ</th><th style="text-align:center">หมายเลขเครื่อง</th>'
+            +'<th style="text-align:center">จำนวนวัน</th><th style="text-align:center">รายละเอียด</th>'
+          +'</tr></thead><tbody id="omTbody"></tbody></table></div>'
+          // ── pager ──
+          +'<div id="omPager"></div>'
+          +'<div style="margin-top:4px;font-size:11px;color:var(--mu)">💡 วันนับจากวันยืม | 🔴 ≥60 วัน = เร่งด่วน</div>'
+        +'</div>'
+        :'<p style="color:var(--ok);text-align:center;padding:14px">✅ ไม่มีรายการเกิน 1 เดือน</p>')
       +'</div>';
+
+    // render ตารางหลัง DOM พร้อม
+    if(!noData) setTimeout(function(){ window._omRenderTable && window._omRenderTable(); }, 60);
   })();
 
-  // ── section 3: วันที่ใช้งาน — bar chart + collapsible table ──
+  // ── section 3: วันที่ใช้งาน — bar chart + search + pagination ──
+  // ── state เก็บไว้บน window เพื่อให้ filterEqDays (global) ใช้ได้ ──
   var _eqdUID='eqdtbl_'+Math.random().toString(36).substr(2,6);
   (function(){
     var eqDaysLocal={};
@@ -4001,6 +4106,13 @@ async function renderSum(r){
     });
     var allEqDays=Object.entries(eqDaysLocal).sort(function(a,b){return b[1].days-a[1].days;});
     var totalEq=allEqDays.length;
+
+    // เก็บไว้บน window ให้ filterEqDays เข้าถึงได้
+    window._eqdData = allEqDays;
+    window._eqdPage = 1;
+    var _EQD_PAGE_SIZE = 30;
+
+    // ── bar chart top 20 (เหมือนเดิม) ──
     var _eqdShow=allEqDays.slice(0,20);
     var _eqdMax=_eqdShow.length>0?_eqdShow[0][1].days:1;
     var _eqdBW=Math.max(20,Math.min(40,Math.floor(660/Math.max(_eqdShow.length,1))));
@@ -4012,6 +4124,7 @@ async function renderSum(r){
         var x=50+i*(_eqdBW+4);
         var col=e[1].days>30?'#ef4444':e[1].days>14?'#f59e0b':'#10b981';
         var lbl=e[0].substring(0,6);
+        // คลิกแท่ง → เปิดตาราง + set search แล้วเรียก filterEqDays
         return'<g style="cursor:pointer" onclick="(function(){var p=document.getElementById(\''+_eqdUID+'\');var b=document.getElementById(\''+_eqdUID+'_btn\');p.style.display=\'\';b.textContent=\'▲ ซ่อนตาราง\';var s=document.getElementById(\'eqDaysSearch\');if(s){s.value=\''+e[0].replace(/'/g,'\\\'').substring(0,10)+'\';filterEqDays(s.value);}})()"><title>'+e[0]+' ('+e[1].equipName+') '+e[1].days+' วัน '+e[1].loanCount+' ครั้ง</title>'
           +'<rect x="'+x+'" y="'+(8+60-hB)+'" width="'+_eqdBW+'" height="'+hB+'" fill="'+col+'" rx="3" opacity=".85"/>'
           +(e[1].active?'<rect x="'+x+'" y="8" width="'+_eqdBW+'" height="4" fill="#10b981" rx="1" opacity=".6"/>':'')
@@ -4030,18 +4143,7 @@ async function renderSum(r){
         +'</div>'
         +'(แสดง '+_eqdShow.length+' อันดับแรก จากทั้งหมด '+totalEq+' เครื่อง)';
     }
-    var eqdRows=allEqDays.map(function(e){
-      var avg=e[1].loanCount>0?(e[1].days/e[1].loanCount).toFixed(1):'-';
-      var dayColor=e[1].days>30?'var(--er)':e[1].days>14?'var(--wn)':'var(--ok)';
-      var activeBadge=e[1].active?'<span style="font-size:9px;background:rgba(16,185,129,.15);color:var(--ok);border:1px solid rgba(16,185,129,.3);border-radius:3px;padding:1px 4px;margin-left:3px">กำลังใช้</span>':'';
-      return'<tr class="eqdrow" data-eqno="'+e[0].toLowerCase()+'" data-eqname="'+e[1].equipName.toLowerCase()+'">'
-        +'<td style="font-family:var(--mo);color:var(--ac);font-weight:700">'+e[0]+activeBadge+'</td>'
-        +'<td>'+e[1].equipName+'</td>'
-        +'<td style="text-align:center;font-family:var(--mo)">'+e[1].loanCount+'</td>'
-        +'<td style="text-align:center;font-family:var(--mo);font-weight:700;color:'+dayColor+'">'+e[1].days+'</td>'
-        +'<td style="text-align:center;font-family:var(--mo);color:var(--mu)">'+avg+'</td>'
-        +'</tr>';
-    }).join('');
+
     window._eqdHtml='<div class="card">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
         +'<div class="ctitle" style="margin:0">🔢 วันที่ใช้งานของเครื่องมือแต่ละเครื่อง</div>'
@@ -4052,20 +4154,27 @@ async function renderSum(r){
       +'</div>'
       +eqdBars
       +'<div id="'+_eqdUID+'" style="display:none">'
-        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'
+        // ── toolbar: search เหมือนเดิม + count ──
+        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">'
           +'<input type="text" id="eqDaysSearch" placeholder="🔍 ค้นหาชื่อเครื่องมือ / หมายเลขเครื่อง..." oninput="filterEqDays(this.value)" style="width:280px;font-size:12px;padding:5px 9px;background:var(--bg);border:1px solid var(--bd);border-radius:5px;color:var(--tx)">'
           +'<span id="eqDaysCount" style="font-size:11px;color:var(--mu)"></span>'
         +'</div>'
+        // ── ตาราง (tbody ว่าง — render โดย filterEqDays) ──
         +'<div class="dtw"><table class="dt" id="eqDaysTbl"><thead><tr>'
           +'<th>หมายเลขเครื่อง</th><th>ชนิดเครื่องมือ</th>'
           +'<th style="text-align:center">จำนวนครั้งที่ยืม</th>'
           +'<th style="text-align:center">วันสะสม</th>'
           +'<th style="text-align:center">เฉลี่ย/ครั้ง (วัน)</th>'
-        +'</tr></thead><tbody id="eqDaysTbody">'+eqdRows+'</tbody></table></div>'
+        +'</tr></thead><tbody id="eqDaysTbody"></tbody></table></div>'
         +(totalEq===0?'<p style="text-align:center;color:var(--mu);padding:16px">ไม่มีข้อมูล</p>':'')
-        +'<div style="margin-top:6px;font-size:11px;color:var(--mu)">💡 วันสะสม = วันระหว่างวันยืม-วันคืน | <span style="color:var(--ok)">กำลังใช้</span> = ยังไม่คืน</div>'
+        // ── pager ──
+        +'<div id="eqdPager"></div>'
+        +'<div style="margin-top:4px;font-size:11px;color:var(--mu)">💡 วันสะสม = วันระหว่างวันยืม-วันคืน | <span style="color:var(--ok)">กำลังใช้</span> = ยังไม่คืน</div>'
       +'</div>'
       +'</div>';
+
+    // render ครั้งแรกหลัง DOM พร้อม
+    if(totalEq>0) setTimeout(function(){ filterEqDays(''); }, 60);
   })();
 
   // ── section 4: Circuit — bar chart + collapsible table ──
@@ -4561,7 +4670,63 @@ function alFilterRows(q){
   if(ql&&sc)sc.querySelectorAll('.al-bar-row').forEach(function(r){r.style.background='';});
   var btn=document.getElementById('alClearEqFilter');if(btn)btn.style.display=ql?'none':'none';
 }
-function filterEqDays(q){var ql=(q||'').toLowerCase().trim();var rows=document.querySelectorAll('#eqDaysTbody .eqdrow');rows.forEach(function(tr){var match=!ql||tr.dataset.eqno.includes(ql)||tr.dataset.eqname.includes(ql);tr.style.display=match?'':'none';});}
+function filterEqDays(q){
+  // ── ใช้ window._eqdData (set โดย renderSum IIFE) ──
+  if(!window._eqdData) return;
+  var ql=(q||'').toLowerCase().trim();
+  var _EQD_PAGE_SIZE=30;
+
+  // กรอง
+  var filtered=window._eqdData.filter(function(e){
+    return !ql || e[0].toLowerCase().includes(ql) || (e[1].equipName||'').toLowerCase().includes(ql);
+  });
+
+  // reset หน้า 1 เมื่อ search เปลี่ยน
+  if(typeof window._eqdLastQ==='undefined') window._eqdLastQ='';
+  if(ql!==window._eqdLastQ){ window._eqdPage=1; window._eqdLastQ=ql; }
+
+  var total=filtered.length;
+  var totalPages=Math.max(1,Math.ceil(total/_EQD_PAGE_SIZE));
+  if(window._eqdPage>totalPages) window._eqdPage=1;
+  var from=(window._eqdPage-1)*_EQD_PAGE_SIZE;
+  var pageItems=filtered.slice(from,from+_EQD_PAGE_SIZE);
+
+  // render tbody
+  var tbody=document.getElementById('eqDaysTbody');
+  if(tbody){
+    tbody.innerHTML=pageItems.map(function(e){
+      var avg=e[1].loanCount>0?(e[1].days/e[1].loanCount).toFixed(1):'-';
+      var dayColor=e[1].days>30?'var(--er)':e[1].days>14?'var(--wn)':'var(--ok)';
+      var activeBadge=e[1].active?'<span style="font-size:9px;background:rgba(16,185,129,.15);color:var(--ok);border:1px solid rgba(16,185,129,.3);border-radius:3px;padding:1px 4px;margin-left:3px">กำลังใช้</span>':'';
+      return'<tr>'
+        +'<td style="font-family:var(--mo);color:var(--ac);font-weight:700">'+e[0]+activeBadge+'</td>'
+        +'<td>'+e[1].equipName+'</td>'
+        +'<td style="text-align:center;font-family:var(--mo)">'+e[1].loanCount+'</td>'
+        +'<td style="text-align:center;font-family:var(--mo);font-weight:700;color:'+dayColor+'">'+e[1].days+'</td>'
+        +'<td style="text-align:center;font-family:var(--mo);color:var(--mu)">'+avg+'</td>'
+        +'</tr>';
+    }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--mu);padding:14px">ไม่พบรายการ</td></tr>';
+  }
+
+  // อัปเดต count
+  var countEl=document.getElementById('eqDaysCount');
+  if(countEl) countEl.textContent='แสดง '+(total?from+1:0)+'–'+Math.min(from+_EQD_PAGE_SIZE,total)+' จาก '+total+' เครื่อง'+(ql?' (ค้นหา: "'+ql+'")':'');
+
+  // render pager
+  var pagerEl=document.getElementById('eqdPager');
+  if(pagerEl){
+    if(totalPages<=1){ pagerEl.innerHTML=''; return; }
+    var btns='<div style="display:flex;align-items:center;justify-content:flex-end;padding:7px 0;gap:3px">';
+    btns+='<button class="btn bg sm" style="padding:3px 9px" '+(window._eqdPage<=1?'disabled':'')+' onclick="window._eqdPage--;filterEqDays(document.getElementById(\'eqDaysSearch\')&&document.getElementById(\'eqDaysSearch\').value||\'\')" >◀</button>';
+    var lo=Math.max(1,window._eqdPage-1), hi=Math.min(totalPages,window._eqdPage+1);
+    if(lo>1) btns+='<button class="btn bg sm" style="padding:3px 9px" onclick="window._eqdPage=1;filterEqDays(document.getElementById(\'eqDaysSearch\')&&document.getElementById(\'eqDaysSearch\').value||\'\')" >1</button>'+(lo>2?'<span style="color:var(--mu);padding:0 3px">…</span>':'');
+    for(var p=lo;p<=hi;p++) btns+='<button class="btn '+(p===window._eqdPage?'bp':'bg')+' sm" style="padding:3px 9px;'+(p===window._eqdPage?'font-weight:700':'')+'" onclick="window._eqdPage='+p+';filterEqDays(document.getElementById(\'eqDaysSearch\')&&document.getElementById(\'eqDaysSearch\').value||\'\')" >'+p+'</button>';
+    if(hi<totalPages) btns+=(hi<totalPages-1?'<span style="color:var(--mu);padding:0 3px">…</span>':'')+' <button class="btn bg sm" style="padding:3px 9px" onclick="window._eqdPage='+totalPages+';filterEqDays(document.getElementById(\'eqDaysSearch\')&&document.getElementById(\'eqDaysSearch\').value||\'\')" >'+totalPages+'</button>';
+    btns+='<button class="btn bg sm" style="padding:3px 9px" '+(window._eqdPage>=totalPages?'disabled':'')+' onclick="window._eqdPage++;filterEqDays(document.getElementById(\'eqDaysSearch\')&&document.getElementById(\'eqDaysSearch\').value||\'\')" >▶</button>';
+    btns+='</div>';
+    pagerEl.innerHTML=btns;
+  }
+}
 function filterAllByEq(eqName){showPg('all',document.querySelectorAll('.nt')[4]);setTimeout(function(){var sel=document.getElementById('allEq');if(sel){sel.value=eqName;renderAll();}},100);}
 function filterAllByDate(dateStr){showPg('all',document.querySelectorAll('.nt')[4]);setTimeout(function(){var ds=document.getElementById('allDateS');var de=document.getElementById('allDateE');if(ds)ds.value=dateStr;if(de)de.value=dateStr;renderAll();},100);}
 
@@ -6046,7 +6211,7 @@ var _INV_DEFAULT=[
   {name:'PCA',total:5,inactive:0,forDept:0},
   {name:'Enteral feeding pump',total:22,inactive:0,forDept:0},
   {name:'Oxygen flow meter pipeline',total:267,inactive:0,forDept:203},
-  {name:'Oxygen flow meter regulator',total:10,inactive:0,forDept:0},
+  {name:'Oxygen flow meter regulator with power take off',total:10,inactive:0,forDept:0},
   {name:'Continuous suction pipeline',total:255,inactive:1,forDept:113},
   {name:'Intermittent suction pipeline',total:15,inactive:2,forDept:0},
   {name:'thoracic suction pipeline',total:13,inactive:0,forDept:0},
