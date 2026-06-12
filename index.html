@@ -669,7 +669,7 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
           <option value="ACC_PENDING">คืนแต่มีอุปกรณ์ค้าง</option>
           <option value="CANCELLED">ยกเลิก</option>
         </select></div>
-      <div class="fg"><label>จาก</label><input type="date" id="recDateS" onchange="_recFilterChange()"></div>
+      <div class="fg"><label id="recDateLabel">วันที่ยืม จาก</label><input type="date" id="recDateS" onchange="_recFilterChange()"></div>
       <div class="fg"><label>ถึง</label><input type="date" id="recDateE" onchange="_recFilterChange()"></div>
       <button class="btn bg sm" onclick="loadAll()">🔄 โหลด</button>
       <div class="fg"><label style="font-size:9px">ดาวน์โหลด</label>
@@ -2253,7 +2253,8 @@ var API = {
     var cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);var cutoffStr=cutoff.toISOString().split('T')[0];
     var query=fullHistory
       ?'order=created_at.desc&limit=100000'
-      :'or=(status.eq.ACTIVE,status.eq.ACC_PENDING,and(status.eq.RETURNED,created_at.gte.'+cutoffStr+'T00:00:00))&order=created_at.desc&limit=20000';
+      // RETURNED: ใช้ return_date (วันที่คืนจริง) แทน created_at เพื่อให้ครอบคลุมรายการที่เพิ่งคืน
+      :'or=(status.eq.ACTIVE,status.eq.ACC_PENDING,and(status.eq.RETURNED,return_date.gte.'+cutoffStr+'))&order=created_at.desc&limit=20000';
     var rows=await SB.get('borrow_records',query);
     return rows.map(function(r){
       var ACC_MAP=[{id:'a1',name:'Oxygen flow meter pipeline with power take off',col:'acc1_flow_meter_pto'},{id:'a2',name:'Oxygen flow meter pipeline 70 LPM',col:'acc2_flow_meter_70'},{id:'a3',name:'Self inflating bag',col:'acc3_self_inflating'},{id:'a4',name:'full face mask',col:'acc4_full_face_mask'},{id:'a5',name:'Nasal cannula HFNC',col:'acc5_nasal_cannula'},{id:'a6',name:'อื่นๆ',col:'acc6_other'}];
@@ -2605,15 +2606,32 @@ function _getRecGroups(){
   var ds=document.getElementById('recDateS').value,de=document.getElementById('recDateE').value;
   var feq=document.getElementById('recEq')?document.getElementById('recEq').value:'';
   var fdept=document.getElementById('recDept')?document.getElementById('recDept').value:'';
+
+  // อัปเดต label วันที่ตามสถานะที่เลือก
+  var lbl=document.getElementById('recDateLabel');
+  if(lbl){
+    var isRetStat=sf==='RETURNED'||sf==='ACC_PENDING';
+    lbl.textContent=isRetStat?'วันที่คืน จาก':'วันที่ยืม จาก';
+  }
+
   var items=expanded().filter(function(item){
     if(sf==='PENDING_ACTIVE'){if(item.status!=='PENDING'&&item.status!=='ACTIVE')return false;}
     else if(sf==='TRANSFERRED'){if(!(item.borrow&&Array.isArray(item.borrow.TransferHistory)&&item.borrow.TransferHistory.length>0))return false;}
     else if(sf&&item.status!==sf)return false;
     if(feq&&S(item.eq.name)!==feq)return false;
     if(fdept&&S(item.loan.DeptName)!==fdept)return false;
-    var ld=item.loan.LoanDate;
-    if(ds&&ld&&ld<ds)return false;
-    if(de&&ld&&ld>de)return false;
+
+    // เลือก date field ตามสถานะ:
+    // RETURNED / ACC_PENDING → ใช้ return_date (วันที่คืนจริง)
+    // อื่นๆ → ใช้ loan_date (วันที่ยืม)
+    var isRet=item.status==='RETURNED'||item.status==='ACC_PENDING';
+    var dateVal=isRet&&item.borrow&&item.borrow.ReturnDate
+      ? item.borrow.ReturnDate
+      : item.loan.LoanDate;
+
+    if(ds&&dateVal&&dateVal<ds)return false;
+    if(de&&dateVal&&dateVal>de)return false;
+
     var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');
     return!search||txt.toLowerCase().includes(search);
   });
@@ -3258,7 +3276,24 @@ async function renderSum(r){
 
   // ─── ตารางยืมคืนรายวัน — ใช้ secDayEq override ───
   var expDay=secDayEq?expFiltered.filter(function(i){return S(i.eq.name)===secDayEq;}):expFiltered;
+
+  // expRet — สำหรับนับ "คืน" โดยกรองด้วย return_date แทน loan_date
+  // เพื่อให้ยอดคืนแต่ละวันตรงกับวันที่คืนจริงจาก Supabase
+  var expRet=exp.filter(function(item){
+    if(item.status!=='RETURNED'&&item.status!=='ACC_PENDING')return false;
+    if(fDept&&S(item.loan.DeptName)!==fDept)return false;
+    if(fEq&&S(item.eq.name)!==fEq)return false;
+    if(secDayEq&&S(item.eq.name)!==secDayEq)return false;
+    if(!item.borrow||!item.borrow.ReturnDate)return false;
+    var rd=item.borrow.ReturnDate;
+    if(fDateS&&rd<fDateS)return false;
+    if(fDateE&&rd>fDateE)return false;
+    return true;
+  });
+
   var dayMap={};var allEqNames2={};
+
+  // นับ "ยืม" — ใช้ loan_date (เหมือนเดิม)
   expDay.forEach(function(item){
     if(!item.loan.LoanDate)return;
     var d=item.loan.LoanDate;
@@ -3267,13 +3302,14 @@ async function renderSum(r){
     if(item.status==='ACTIVE'||item.status==='ACC_PENDING'||item.status==='RETURNED'){
       dayMap[d].borrow[n]=(dayMap[d].borrow[n]||0)+1;
     }
-    if(item.status==='RETURNED'||item.status==='ACC_PENDING'){
-      if(item.borrow&&item.borrow.ReturnDate){
-        var rd=item.borrow.ReturnDate;
-        if(!dayMap[rd])dayMap[rd]={borrow:{},ret:{},accPend:{}};
-        dayMap[rd].ret[n]=(dayMap[rd].ret[n]||0)+1;
-      }
-    }
+  });
+
+  // นับ "คืน" — ใช้ return_date จาก expRet (กรองด้วย return_date แล้ว)
+  expRet.forEach(function(item){
+    var rd=item.borrow.ReturnDate;
+    if(!dayMap[rd])dayMap[rd]={borrow:{},ret:{},accPend:{}};
+    var n=S(item.eq.name);allEqNames2[n]=true;
+    dayMap[rd].ret[n]=(dayMap[rd].ret[n]||0)+1;
   });
   var eqNames2=Object.keys(allEqNames2).sort();
   var dayList=Object.keys(dayMap).sort().reverse();
@@ -5886,7 +5922,12 @@ function getPageData(page){
       if(sf==='PENDING_ACTIVE'){if(item.status!=='PENDING'&&item.status!=='ACTIVE')return false;}
       else if(sf==='TRANSFERRED'){if(!(item.borrow&&Array.isArray(item.borrow.TransferHistory)&&item.borrow.TransferHistory.length>0))return false;}
       else if(sf&&item.status!==sf)return false;
-      if(feq&&S(item.eq.name)!==feq)return false;if(fdept&&S(item.loan.DeptName)!==fdept)return false;var ld=item.loan.LoanDate;if(ds&&ld&&ld<ds)return false;if(de&&ld&&ld>de)return false;var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');return!search||txt.toLowerCase().includes(search);}));
+      if(feq&&S(item.eq.name)!==feq)return false;if(fdept&&S(item.loan.DeptName)!==fdept)return false;
+      // ใช้ return_date สำหรับ RETURNED/ACC_PENDING, loan_date สำหรับสถานะอื่น (ตรงกับ _getRecGroups)
+      var isRet=item.status==='RETURNED'||item.status==='ACC_PENDING';
+      var dateVal=isRet&&item.borrow&&item.borrow.ReturnDate?item.borrow.ReturnDate:item.loan.LoanDate;
+      if(ds&&dateVal&&dateVal<ds)return false;if(de&&dateVal&&dateVal>de)return false;
+      var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');return!search||txt.toLowerCase().includes(search);}));
     rows.push(['LoanID','วันที่ยืม','ผู้ยืม','แผนก','ผู้ป่วย','เครื่องมือ','หมายเลขเครื่อง','อุปกรณ์ประกอบ','วันที่ใช้','สถานะ','ผู้ให้ยืม','ผู้รับคืน','วันที่คืน','เหตุผลคืน','ประวัติโอน']);
     items.forEach(function(item){var ld=item.loan.LoanDate,startD=ld?new Date(ld):null,endD=item.borrow&&item.borrow.ReturnDate?new Date(item.borrow.ReturnDate):now;var days=startD&&(item.status==='ACTIVE'||item.status==='RETURNED'||item.status==='ACC_PENDING')?Math.max(0,Math.round((endD-startD)/86400000)):'-';var accs=item.borrow&&Array.isArray(item.borrow.Accessories)?item.borrow.Accessories:[];var th=item.borrow&&Array.isArray(item.borrow.TransferHistory)?item.borrow.TransferHistory:[];rows.push([S(item.loan.LoanID),ld||'',S(item.loan.BorrowerName),S(item.loan.DeptName),S(item.loan.PatientName),S(item.eq.name),item.borrow?S(item.borrow.EquipmentNo||''):'-',accs.length||0,days,({PENDING:'รอดำเนินการจ่าย',ACTIVE:'ยืม',RETURNED:'คืน',ACC_PENDING:'คืน (อุปกรณ์ค้าง)',CANCELLED:'ยกเลิก'}[item.status]||item.status),item.borrow?S(item.borrow.GiverName||''):'-',item.borrow?S(item.borrow.ReceiverName||''):'-',item.borrow?S(item.borrow.ReturnDate||''):'-',item.borrow?S(item.borrow.ReturnRemark||''):'-',th.map(function(t){return t.date+':'+S(t.toDept);}).join('→')]);});
   }else if(page==='daily'){var filter=document.getElementById('dailyFilter').value;var activeItems=exp.filter(function(i){return i.status==='ACTIVE'&&(!filter||S(i.eq.name)===filter);});rows.push(['หมายเลขเครื่อง','ชนิดเครื่องมือ','วันที่ยืม','แผนก','ผู้ป่วย','วันที่ใช้','ผู้ให้ยืม','ประวัติโอน','อุปกรณ์ประกอบ']);activeItems.forEach(function(item){var ld=item.loan.LoanDate||'-',days=ld!=='-'?Math.max(0,Math.round((now-new Date(ld))/86400000)):'-';var th=item.borrow&&item.borrow.TransferHistory?item.borrow.TransferHistory:[];rows.push([item.borrow?S(item.borrow.EquipmentNo||'—'):'—',S(item.eq.name),ld,S(item.loan.DeptName),S(item.loan.PatientName),days,item.borrow?S(item.borrow.GiverName||'-'):'-',th.map(function(t){return S(t.toDept)+'('+t.date+')';}).join('→'),(item.borrow&&item.borrow.Accessories?item.borrow.Accessories.length:0)]);});}
