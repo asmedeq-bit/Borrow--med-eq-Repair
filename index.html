@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>ระบบยืมคืนเครื่องมือแพทย์ แผนกบริการเครื่องมือและอุปกรณ์ทางการแพทย์</title>
+<title>ระบบยืมคืนเครื่องมือแพทย์ แผนกบริการเครื่องมือและอุปกรณ์ทางการแพทย์
+</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d1117;--s1:#161b22;--s2:#1f2937;--bd:#30363d;--ac:#00c8ff;--ac2:#7c3aed;--ok:#10b981;--wn:#f59e0b;--er:#ef4444;--tx:#e6edf3;--mu:#8b949e;--fn:'Sarabun',sans-serif;--mo:'IBM Plex Mono',monospace}
@@ -805,6 +806,39 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
       </div>
       <button class="btn bp sm" onclick="loadSum()">🔍 ดู</button>
       <button class="btn bg sm" onclick="clearSumFilter()">✕ ล้างทั้งหมด</button>
+      <button class="btn bg sm" id="sumFullBtn" title="โหลดข้อมูลทั้งหมดย้อนหลัง 2–3 ปี (ช้ากว่าปกติ ~10 วินาที)" onclick="(function(){
+        var btn=document.getElementById('sumFullBtn');
+        if(window._sumIsFullHistory){
+          // รีเซ็ตกลับโหมดปกติ
+          window._sumIsFullHistory=false;
+          btn.textContent='📥 โหลดข้อมูลเต็ม';
+          btn.title='โหลดข้อมูลทั้งหมดย้อนหลัง 2–3 ปี (ช้ากว่าปกติ ~10 วินาที)';
+          btn.style.borderColor='';btn.style.color='';
+          Promise.all([API.getAllLoans(false),API.getAllBorrows(false)]).then(function(res){
+            loans=res[0];borrows=res[1];
+            loadSum();
+            toast('กลับสู่โหมดปกติแล้ว','success');
+          });
+          return;
+        }
+        // โหลด fullHistory
+        btn.textContent='⏳ กำลังโหลด...';
+        btn.disabled=true;
+        Promise.all([API.getAllLoans(true),API.getAllBorrows(true)]).then(function(res){
+          loans=res[0];borrows=res[1];
+          window._sumIsFullHistory=true;
+          btn.textContent='✅ โหลดเต็มแล้ว (คลิกรีเซ็ต)';
+          btn.disabled=false;
+          btn.style.borderColor='var(--ok)';btn.style.color='var(--ok)';
+          btn.title='กำลังแสดงข้อมูลเต็ม — คลิกเพื่อกลับโหมดปกติ';
+          loadSum();
+          toast('โหลดข้อมูลเต็มสำเร็จ — สามารถ export ได้เลย','success');
+        }).catch(function(err){
+          btn.textContent='📥 โหลดข้อมูลเต็ม';
+          btn.disabled=false;
+          toast('โหลดไม่สำเร็จ: '+err.message,'error');
+        });
+      })()">📥 โหลดข้อมูลเต็ม</button>
     </div>
     <div id="sumFilterBadges" style="display:none;margin-top:8px;gap:6px;flex-wrap:wrap"></div>
   </div>
@@ -4239,7 +4273,306 @@ async function renderSum(r){
       +'</div>';
   })();
 
-  var origHtml=(window._omHtml||'')+(window._eqdHtml||'')+(window._cirHtml||'');
+  // ── section: ยืมแยกตามแผนก × ชนิดเครื่องมือ ──────────────────
+  // ── IIFE อิสระ — ไม่ share state กับ section อื่น ──────────────
+  (function(){
+    var _dpUID='dp_'+Math.random().toString(36).substr(2,6);
+
+    // ── default date range = 7 วัน ──
+    var _today=localDateStr(new Date());
+    var _d7=new Date(); _d7.setDate(_d7.getDate()-6);
+    var _7ago=localDateStr(_d7);
+
+    // ── state บน window ให้ฟังก์ชัน onclick เข้าถึงได้ ──
+    if(!window._dpState) window._dpState={dateS:_7ago,dateE:_today,dept:'',eq:''};
+
+    // ── ฟังก์ชัน render pivot (เรียกซ้ำได้ปลอดภัย) ──
+    window._dpRender=function(){
+      var cont=document.getElementById(_dpUID+'_body');
+      if(!cont)return;
+
+      var ds=window._dpState.dateS||_7ago;
+      var de=window._dpState.dateE||_today;
+      var fDept2=window._dpState.dept||'';
+      var fEq2=window._dpState.eq||'';
+
+      // ── safeguard: จำกัด range สูงสุด 90 วัน ──
+      var dsD=new Date(ds), deD=new Date(de);
+      var rangeDays=Math.round((deD-dsD)/86400000)+1;
+      if(rangeDays>90){
+        dsD=new Date(de); dsD.setDate(dsD.getDate()-89);
+        ds=localDateStr(dsD); rangeDays=90;
+        window._dpState.dateS=ds;
+        var inp=document.getElementById(_dpUID+'_ds');
+        if(inp)inp.value=ds;
+      }
+
+      // ── กรองข้อมูล ──
+      var rows=expanded().filter(function(item){
+        if(item.status==='CANCELLED')return false;
+        var ld=item.loan.LoanDate||'';
+        if(!ld)return false;
+        if(ld<ds||ld>de)return false;
+        if(fDept2&&S(item.loan.DeptName)!==fDept2)return false;
+        if(fEq2&&S(item.eq.name)!==fEq2)return false;
+        return true;
+      });
+
+      var total=rows.length;
+
+      // ── ถ้าไม่มีข้อมูล ──
+      if(!total){
+        cont.innerHTML='<div style="text-align:center;padding:28px;color:var(--mu)">'
+          +'<div style="font-size:32px;margin-bottom:8px">📭</div>'
+          +'<div style="font-size:13px">ไม่มีข้อมูลในช่วงที่เลือก</div>'
+          +'<div style="font-size:11px;color:var(--mu);margin-top:4px">'+ds+' — '+de+'</div>'
+        +'</div>';
+        return;
+      }
+
+      // ── group by วันที่ × แผนก × eq ──
+      var dateMap={}; // {date: {dept: {eq: count}}}
+      var allDepts={},allEqs={};
+      var totByDate={},totByDept={},totByEq={};
+      var grandTotal=0;
+      var statCount={ACTIVE:0,RETURNED:0,ACC_PENDING:0,PENDING:0};
+
+      rows.forEach(function(item){
+        var ld=item.loan.LoanDate;
+        var dept=S(item.loan.DeptName)||'ไม่ระบุ';
+        var eq=S(item.eq.name)||'ไม่ระบุ';
+        var st=item.status;
+
+        if(!dateMap[ld])dateMap[ld]={};
+        if(!dateMap[ld][dept])dateMap[ld][dept]={};
+        dateMap[ld][dept][eq]=(dateMap[ld][dept][eq]||0)+1;
+
+        allDepts[dept]=true; allEqs[eq]=true;
+        totByDate[ld]=(totByDate[ld]||0)+1;
+        totByDept[dept]=(totByDept[dept]||0)+1;
+        totByEq[eq]=(totByEq[eq]||0)+1;
+        grandTotal++;
+        if(statCount[st]!==undefined)statCount[st]++;
+      });
+
+      // ── eq columns: เฉพาะที่มีค่า > 0 เรียงตาม totByEq ──
+      var eqCols=Object.keys(allEqs).sort(function(a,b){return(totByEq[b]||0)-(totByEq[a]||0);});
+      // ── วันที่ เรียงใหม่ล่าสุดก่อน ──
+      var dates=Object.keys(dateMap).sort(function(a,b){return b.localeCompare(a);});
+      // ── แผนก dropdown ──
+      var allDeptList=Object.keys(allDepts).sort(function(a,b){return(totByDept[b]||0)-(totByDept[a]||0);});
+      // ── top 4 แผนก + eq สำหรับ rank cards ──
+      var topDepts=Object.entries(totByDept).sort(function(a,b){return b[1]-a[1];}).slice(0,4);
+      var topEqs=Object.entries(totByEq).sort(function(a,b){return b[1]-a[1];}).slice(0,4);
+      var maxDeptVal=topDepts.length?topDepts[0][1]:1;
+      var maxEqVal=topEqs.length?topEqs[0][1]:1;
+
+      // ── trend: วันนี้ vs เมื่อวาน ──
+      var todayCount=totByDate[_today]||0;
+      var yd=new Date(); yd.setDate(yd.getDate()-1);
+      var ydStr=localDateStr(yd);
+      var ydCount=totByDate[ydStr]||0;
+      var todayDepts=Object.keys(dateMap[_today]||{}).length;
+      var ydDepts=Object.keys(dateMap[ydStr]||{}).length;
+      var todayEqs={}; (rows.filter(function(i){return i.loan.LoanDate===_today;})).forEach(function(i){todayEqs[S(i.eq.name)]=true;});
+      var ydEqs={}; (rows.filter(function(i){return i.loan.LoanDate===ydStr;})).forEach(function(i){ydEqs[S(i.eq.name)]=true;});
+      var todayEqCnt=Object.keys(todayEqs).length, ydEqCnt=Object.keys(ydEqs).length;
+      function trendBadge(a,b){
+        if(a>b) return '<span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:99px;background:rgba(239,68,68,.12);color:#ef4444">▲ '+(a-b)+'</span>';
+        if(a<b) return '<span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:99px;background:rgba(16,185,129,.12);color:#10b981">▼ '+(b-a)+'</span>';
+        return '<span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:99px;background:var(--s2);color:var(--mu)">= 0</span>';
+      }
+      var avgPerDay=rangeDays>0?(grandTotal/rangeDays).toFixed(1):0;
+
+      // ── สร้าง HTML ──
+
+      // summary cards แถว 1: KPI
+      var kpiHtml='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px">'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;text-align:center;border:0.5px solid var(--bd)"><div style="font-size:18px;font-weight:700;font-family:var(--mo);color:var(--ac)">'+rangeDays+'</div><div style="font-size:9px;color:var(--mu);margin-top:2px">วันที่เลือก</div></div>'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;text-align:center;border:0.5px solid var(--bd)"><div style="font-size:18px;font-weight:700;font-family:var(--mo);color:var(--er)">'+grandTotal+'</div><div style="font-size:9px;color:var(--mu);margin-top:2px">รายการทั้งหมด</div></div>'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;text-align:center;border:0.5px solid var(--bd)"><div style="font-size:18px;font-weight:700;font-family:var(--mo);color:var(--ok)">'+Object.keys(allDepts).length+'</div><div style="font-size:9px;color:var(--mu);margin-top:2px">แผนกที่ยืม</div></div>'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;text-align:center;border:0.5px solid var(--bd)"><div style="font-size:18px;font-weight:700;font-family:var(--mo);color:var(--wn)">'+avgPerDay+'</div><div style="font-size:9px;color:var(--mu);margin-top:2px">เฉลี่ย/วัน</div></div>'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;text-align:center;border:0.5px solid var(--bd)"><div style="font-size:18px;font-weight:700;font-family:var(--mo);color:var(--ac2)">'+eqCols.length+'</div><div style="font-size:9px;color:var(--mu);margin-top:2px">ชนิดเครื่องมือ</div></div>'
+      +'</div>';
+
+      // summary cards แถว 2: top rank
+      function rankBar(val,maxVal,col){
+        var pct=maxVal>0?Math.round(val/maxVal*100):0;
+        return '<div style="width:60px;height:5px;background:var(--bd);border-radius:3px;display:inline-block;vertical-align:middle">'
+          +'<div style="width:'+pct+'%;height:5px;background:'+col+';border-radius:3px"></div></div>';
+      }
+      var rankHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;border:0.5px solid var(--bd)">'
+          +'<div style="font-size:9px;color:var(--mu);text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px;font-weight:500">🏆 Top แผนกที่ยืมมากสุด</div>'
+          +topDepts.map(function(e,i){var cols=['#ef4444','#f59e0b','#58a6ff','#8b949e'];var c=cols[i]||'var(--mu)';return'<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><div style="font-size:11px;color:var(--tx);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+e[0]+'">'+e[0]+'</div>'+rankBar(e[1],maxDeptVal,c)+'<div style="font-size:10px;font-family:var(--mo);font-weight:600;color:'+c+';width:22px;text-align:right">'+e[1]+'</div></div>';}).join('')
+        +'</div>'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;border:0.5px solid var(--bd)">'
+          +'<div style="font-size:9px;color:var(--mu);text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px;font-weight:500">🔧 Top เครื่องมือที่ยืมมากสุด</div>'
+          +topEqs.map(function(e,i){var cols=['#ef4444','#f59e0b','#58a6ff','#8b949e'];var c=cols[i]||'var(--mu)';return'<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><div style="font-size:11px;color:var(--tx);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+e[0]+'">'+e[0]+'</div>'+rankBar(e[1],maxEqVal,c)+'<div style="font-size:10px;font-family:var(--mo);font-weight:600;color:'+c+';width:22px;text-align:right">'+e[1]+'</div></div>';}).join('')
+        +'</div>'
+      +'</div>';
+
+      // summary cards แถว 3: trend
+      var trendHtml='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px">'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;border:0.5px solid var(--bd);display:flex;align-items:center;gap:8px"><div style="font-size:20px;flex-shrink:0">📈</div><div><div style="display:flex;align-items:center;gap:5px"><div style="font-size:15px;font-weight:700;font-family:var(--mo)">'+todayCount+'</div>'+trendBadge(todayCount,ydCount)+'</div><div style="font-size:9px;color:var(--mu)">วันนี้ vs เมื่อวาน ('+ydCount+')</div></div></div>'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;border:0.5px solid var(--bd);display:flex;align-items:center;gap:8px"><div style="font-size:20px;flex-shrink:0">🏥</div><div><div style="display:flex;align-items:center;gap:5px"><div style="font-size:15px;font-weight:700;font-family:var(--mo)">'+todayDepts+'</div>'+trendBadge(todayDepts,ydDepts)+'</div><div style="font-size:9px;color:var(--mu)">แผนกวันนี้ vs เมื่อวาน ('+ydDepts+')</div></div></div>'
+        +'<div style="background:var(--s2);border-radius:7px;padding:8px 10px;border:0.5px solid var(--bd);display:flex;align-items:center;gap:8px"><div style="font-size:20px;flex-shrink:0">📦</div><div><div style="display:flex;align-items:center;gap:5px"><div style="font-size:15px;font-weight:700;font-family:var(--mo)">'+todayEqCnt+'</div>'+trendBadge(todayEqCnt,ydEqCnt)+'</div><div style="font-size:9px;color:var(--mu)">ชนิดวันนี้ vs เมื่อวาน ('+ydEqCnt+')</div></div></div>'
+      +'</div>';
+
+      // pivot table
+      var pivotHtml='<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;font-weight:500">📋 ตารางรายละเอียด</div>'
+        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+        +'<thead><tr>'
+          +'<th style="background:var(--s2);padding:5px 8px;border:0.5px solid var(--bd);font-size:9px;font-weight:500;color:var(--mu);text-align:left;min-width:70px;white-space:nowrap">วันที่</th>'
+          +'<th style="background:var(--s2);padding:5px 8px;border:0.5px solid var(--bd);font-size:9px;font-weight:500;color:var(--mu);text-align:left;min-width:90px;white-space:nowrap">แผนก</th>'
+          +eqCols.map(function(eq){return'<th style="background:var(--s2);padding:5px 8px;border:0.5px solid var(--bd);font-size:9px;font-weight:500;color:var(--mu);text-align:center;white-space:nowrap;max-width:80px">'+eq+'</th>';}).join('')
+          +'<th style="background:var(--s2);padding:5px 8px;border:0.5px solid var(--bd);font-size:9px;font-weight:500;color:var(--mu);text-align:center;border-left:1px solid var(--bd);white-space:nowrap">รวม</th>'
+        +'</tr></thead><tbody>';
+
+      dates.forEach(function(date){
+        var deptList2=Object.keys(dateMap[date]).sort(function(a,b){
+          var ta=Object.values(dateMap[date][a]).reduce(function(s,v){return s+v;},0);
+          var tb=Object.values(dateMap[date][b]).reduce(function(s,v){return s+v;},0);
+          return tb-ta;
+        });
+        var dateTotal=totByDate[date]||0;
+        var rowspan=deptList2.length+1; // +1 สำหรับ subtotal row
+
+        deptList2.forEach(function(dept,di){
+          var deptTotal=Object.values(dateMap[date][dept]).reduce(function(s,v){return s+v;},0);
+          pivotHtml+='<tr'+(di===0?' style="border-top:1.5px solid var(--bd)"':'')+'>';
+          // date cell — แสดงเฉพาะ row แรกของวัน
+          if(di===0){
+            pivotHtml+='<td rowspan="'+rowspan+'" style="background:var(--s1);padding:5px 8px;border:0.5px solid var(--bd);font-weight:600;font-size:11px;text-align:center;vertical-align:middle;white-space:nowrap">'+date+'</td>';
+          }
+          pivotHtml+='<td style="padding:5px 8px;border:0.5px solid var(--bd);font-weight:500;white-space:nowrap">'+dept+'</td>';
+          eqCols.forEach(function(eq){
+            var cnt=dateMap[date][dept][eq]||0;
+            var style=cnt>=5?'color:var(--er);font-weight:700;background:rgba(239,68,68,.05)':cnt>=2?'color:var(--wn);font-weight:600':cnt>0?'color:var(--tx)':'color:var(--bd)';
+            pivotHtml+='<td style="padding:5px 8px;border:0.5px solid var(--bd);text-align:center;font-family:var(--mo);font-size:11px;'+style+'">'+(cnt>0?cnt:'-')+'</td>';
+          });
+          pivotHtml+='<td style="padding:5px 8px;border:0.5px solid var(--bd);text-align:center;font-family:var(--mo);font-weight:700;color:var(--ac);border-left:1px solid var(--bd)">'+deptTotal+'</td>';
+          pivotHtml+='</tr>';
+        });
+
+        // subtotal row
+        pivotHtml+='<tr style="border-top:0.5px dashed var(--bd)">'
+          +'<td style="padding:4px 8px;border:0.5px solid var(--bd);font-size:9px;color:var(--mu);font-style:italic;background:var(--s1)">รวม '+date+'</td>'
+          +eqCols.map(function(eq){
+            var s=Object.keys(dateMap[date]).reduce(function(sum,dept){return sum+(dateMap[date][dept][eq]||0);},0);
+            return'<td style="padding:4px 8px;border:0.5px solid var(--bd);text-align:center;font-family:var(--mo);font-size:10px;font-weight:600;color:var(--wn);background:var(--s1)">'+(s>0?s:'-')+'</td>';
+          }).join('')
+          +'<td style="padding:4px 8px;border:0.5px solid var(--bd);text-align:center;font-family:var(--mo);font-weight:700;color:var(--wn);border-left:1px solid var(--bd);background:var(--s1)">'+dateTotal+'</td>'
+        +'</tr>';
+      });
+
+      // grand total row
+      pivotHtml+='<tr style="border-top:2px solid var(--bd)">'
+        +'<td style="padding:5px 8px;border:0.5px solid var(--bd);background:var(--s2);font-size:9px;color:var(--mu)">รวมทั้งหมด</td>'
+        +'<td style="padding:5px 8px;border:0.5px solid var(--bd);background:var(--s2)"></td>'
+        +eqCols.map(function(eq){return'<td style="padding:5px 8px;border:0.5px solid var(--bd);text-align:center;font-family:var(--mo);font-weight:700;color:var(--ac);background:var(--s2)">'+(totByEq[eq]||0)+'</td>';}).join('')
+        +'<td style="padding:5px 8px;border:0.5px solid var(--bd);text-align:center;font-family:var(--mo);font-weight:700;color:var(--er);border-left:1px solid var(--bd);background:var(--s2)">'+grandTotal+'</td>'
+      +'</tr>';
+
+      pivotHtml+='</tbody></table></div>'
+        +'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:10px;font-size:10px;color:var(--mu)">'
+          +'<span><span style="color:var(--er);font-weight:700">■</span> มาก (≥5)</span>'
+          +'<span><span style="color:var(--wn);font-weight:700">■</span> ปานกลาง (2–4)</span>'
+          +'<span style="color:var(--mu)">■ น้อย (1)</span>'
+          +'<span style="color:var(--bd)">■ ไม่มี (-)</span>'
+          +(rangeDays>=90?'<span style="color:var(--wn)">⚠️ แสดงสูงสุด 90 วัน</span>':'')
+        +'</div>';
+
+      cont.innerHTML=kpiHtml+rankHtml+trendHtml+pivotHtml;
+    };
+
+    // ── สร้าง dropdown options ──
+    var allExpDepts={},allExpEqs={};
+    expFiltered.forEach(function(item){
+      if(item.status!=='CANCELLED'){
+        allExpDepts[S(item.loan.DeptName)||'ไม่ระบุ']=true;
+        allExpEqs[S(item.eq.name)||'ไม่ระบุ']=true;
+      }
+    });
+    var deptOpts='<option value="">ทุกแผนก</option>'+Object.keys(allExpDepts).sort().map(function(d){return'<option value="'+d+'"'+(window._dpState.dept===d?' selected':'')+'>'+d+'</option>';}).join('');
+    var eqOpts='<option value="">ทุกชนิด</option>'+Object.keys(allExpEqs).sort().map(function(e){return'<option value="'+e+'"'+(window._dpState.eq===e?' selected':'')+'>'+e+'</option>';}).join('');
+
+    // ── สร้าง outer HTML (structure คงที่ body render แยก) ──
+    window._dpHtml='<div class="card">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
+        +'<div class="ctitle" style="margin:0">🏥 การยืมแยกตามแผนก × ชนิดเครื่องมือ</div>'
+        +'<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'
+          +'<button class="btn bg sm" id="'+_dpUID+'_csvbtn" style="font-size:11px">CSV</button>'
+          +'<button id="'+_dpUID+'_toggle" class="btn bg sm" style="font-size:11px" onclick="(function(){var b=document.getElementById(\''+_dpUID+'_body\');var t=document.getElementById(\''+_dpUID+'_toggle\');if(b.style.display===\'none\'){b.style.display=\'\';t.textContent=\'▲ ซ่อน\';}else{b.style.display=\'none\';t.textContent=\'▼ แสดง\';}})()">▲ ซ่อน</button>'
+        +'</div>'
+      +'</div>'
+      // filter bar
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 10px;background:var(--s2);border-radius:6px;border:0.5px solid var(--bd);margin-bottom:12px">'
+        +'<span style="font-size:10px;color:var(--mu);flex-shrink:0">📅 วันที่:</span>'
+        +'<input type="date" id="'+_dpUID+'_ds" value="'+window._dpState.dateS+'" onchange="window._dpState.dateS=this.value;window._dpRender&&window._dpRender();" style="font-size:11px;padding:3px 7px;background:var(--bg);border:0.5px solid var(--bd);border-radius:4px;color:var(--tx)">'
+        +'<span style="color:var(--mu);font-size:11px">—</span>'
+        +'<input type="date" id="'+_dpUID+'_de" value="'+window._dpState.dateE+'" onchange="window._dpState.dateE=this.value;window._dpRender&&window._dpRender();" style="font-size:11px;padding:3px 7px;background:var(--bg);border:0.5px solid var(--bd);border-radius:4px;color:var(--tx)">'
+        +'<button class="btn bg sm" style="font-size:10px" onclick="(function(){var t=\''+_today+'\';window._dpState.dateS=t;window._dpState.dateE=t;document.getElementById(\''+_dpUID+'_ds\').value=t;document.getElementById(\''+_dpUID+'_de\').value=t;window._dpRender&&window._dpRender();})()">วันนี้</button>'
+        +'<button class="btn bg sm" style="font-size:10px" onclick="(function(){var d=new Date();d.setDate(d.getDate()-6);var s=\''+localDateStr(new Date(new Date().setDate(new Date().getDate()-6)))+'\';var e=\''+_today+'\';window._dpState.dateS=s;window._dpState.dateE=e;document.getElementById(\''+_dpUID+'_ds\').value=s;document.getElementById(\''+_dpUID+'_de\').value=e;window._dpRender&&window._dpRender();})()">7 วัน</button>'
+        +'<button class="btn bg sm" style="font-size:10px" onclick="(function(){var d=new Date();d.setDate(d.getDate()-29);var s=\''+localDateStr(new Date(new Date().setDate(new Date().getDate()-29)))+'\';var e=\''+_today+'\';window._dpState.dateS=s;window._dpState.dateE=e;document.getElementById(\''+_dpUID+'_ds\').value=s;document.getElementById(\''+_dpUID+'_de\').value=e;window._dpRender&&window._dpRender();})()">30 วัน</button>'
+        +'<span style="font-size:10px;color:var(--mu);flex-shrink:0;margin-left:4px">แผนก:</span>'
+        +'<select id="'+_dpUID+'_dept" onchange="window._dpState.dept=this.value;window._dpRender&&window._dpRender();" style="font-size:11px;padding:3px 6px;background:var(--bg);border:0.5px solid var(--bd);border-radius:4px;color:var(--tx)">'+deptOpts+'</select>'
+        +'<span style="font-size:10px;color:var(--mu);flex-shrink:0">เครื่องมือ:</span>'
+        +'<select id="'+_dpUID+'_eq" onchange="window._dpState.eq=this.value;window._dpRender&&window._dpRender();" style="font-size:11px;padding:3px 6px;background:var(--bg);border:0.5px solid var(--bd);border-radius:4px;color:var(--tx)">'+eqOpts+'</select>'
+      +'</div>'
+      // body (render แยก)
+      +'<div id="'+_dpUID+'_body"><div style="text-align:center;padding:20px;color:var(--mu)"><div class="spin"></div></div></div>'
+    +'</div>';
+
+    // render ครั้งแรก + ผูก CSV export หลัง DOM พร้อม
+    setTimeout(function(){
+      window._dpRender&&window._dpRender();
+      // ผูกปุ่ม CSV export หลัง render เสร็จ
+      var csvBtn=document.getElementById(_dpUID+'_csvbtn');
+      if(csvBtn){
+        csvBtn.onclick=function(){
+          var ds=window._dpState.dateS,de=window._dpState.dateE;
+          var rows=expanded().filter(function(item){
+            if(item.status==='CANCELLED')return false;
+            var ld=item.loan.LoanDate||'';
+            if(!ld||ld<ds||ld>de)return false;
+            if(window._dpState.dept&&S(item.loan.DeptName)!==window._dpState.dept)return false;
+            if(window._dpState.eq&&S(item.eq.name)!==window._dpState.eq)return false;
+            return true;
+          });
+          if(!rows.length){toast('ไม่มีข้อมูล','warning');return;}
+          // สร้าง pivot CSV
+          var eqColsC={};rows.forEach(function(i){eqColsC[S(i.eq.name)]=true;});
+          var eqC=Object.keys(eqColsC).sort();
+          var dateMapC={};
+          rows.forEach(function(item){
+            var ld=item.loan.LoanDate,dept=S(item.loan.DeptName)||'ไม่ระบุ',eq=S(item.eq.name)||'ไม่ระบุ';
+            if(!dateMapC[ld])dateMapC[ld]={};
+            if(!dateMapC[ld][dept])dateMapC[ld][dept]={};
+            dateMapC[ld][dept][eq]=(dateMapC[ld][dept][eq]||0)+1;
+          });
+          var header=['วันที่','แผนก'].concat(eqC).concat(['รวม']);
+          var csvRows=[header];
+          Object.keys(dateMapC).sort(function(a,b){return b.localeCompare(a);}).forEach(function(date){
+            Object.keys(dateMapC[date]).forEach(function(dept){
+              var tot=0;
+              var cells=[date,dept];
+              eqC.forEach(function(eq){var v=dateMapC[date][dept][eq]||0;cells.push(v);tot+=v;});
+              cells.push(tot);
+              csvRows.push(cells);
+            });
+          });
+          var csv=csvRows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+          var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+          var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+          a.download='dept_pivot_'+ds+'_'+de+'.csv';a.click();
+          toast('Export CSV สำเร็จ','success');
+        };
+      }
+    },80);
+  })();
+
+  var origHtml=(window._omHtml||'')+(window._eqdHtml||'')+(window._cirHtml||'')+(window._dpHtml||'');
 
 
   // ─── allLoansHtml ─────────────────────────────────────────
