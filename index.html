@@ -2654,10 +2654,11 @@ function _getRecGroups(){
     if(feq&&S(item.eq.name)!==feq)return false;
     if(fdept&&S(item.loan.DeptName)!==fdept)return false;
 
-    // เลือก date field ตามสถานะ:
-    // RETURNED / ACC_PENDING → ใช้ return_date (วันที่คืนจริง)
-    // อื่นๆ → ใช้ loan_date (วันที่ยืม)
-    var isRet=item.status==='RETURNED'||item.status==='ACC_PENDING';
+    // เลือก date field ตาม "สถานะที่ผู้ใช้กรอง" (sf) ไม่ใช่สถานะของแต่ละแถว
+    // เพื่อให้ field วันที่ที่กรองตรงกับ label เสมอ ("วันที่ยืม จาก" / "วันที่คืน จาก")
+    // sf='RETURNED'/'ACC_PENDING' (เลือกเฉพาะสถานะคืน) → ใช้ return_date ทุกแถว
+    // sf อื่นๆ (รวม '' = ทั้งหมด, TRANSFERRED, ฯลฯ) → ใช้ loan_date ทุกแถว
+    var isRet=sf==='RETURNED'||sf==='ACC_PENDING';
     var dateVal=isRet&&item.borrow&&item.borrow.ReturnDate
       ? item.borrow.ReturnDate
       : item.loan.LoanDate;
@@ -4595,14 +4596,35 @@ async function renderSum(r){
   var eqBarArr=Object.entries(eqCountAll).sort(function(a,b){return b[1]-a[1];});
   var maxBarVal=eqBarArr.length>0?eqBarArr[0][1]:1;
   var BAR_COLORS=['#00c8ff','#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#34d399','#fbbf24','#f87171','#22d3ee','#a78bfa','#fb923c','#4ade80','#c084fc','#fb7185','#38bdf8','#facc15','#e879f9','#a3e635'];
+  // ── deptByEq: แยกตามแผนกสำหรับแต่ละชนิดเครื่องมือ (ใช้ allLoansRows ชุดเดียวกับ eqCountAll — กรองตามวันที่/filter ของหน้าสถิติอยู่แล้ว) ──
+  var deptByEq={};
+  allLoansRows.forEach(function(item){
+    var n=S(item.eq.name);
+    var d=S(item.loan.DeptName)||'ไม่ระบุ';
+    if(!deptByEq[n])deptByEq[n]={};
+    deptByEq[n][d]=(deptByEq[n][d]||0)+1;
+  });
   var barChartHtml2='';
   if(eqBarArr.length){
     var barRows2=eqBarArr.map(function(e,i){
       var pct=maxBarVal>0?e[1]/maxBarVal*100:0;
       var col=BAR_COLORS[i%BAR_COLORS.length];
-      return'<div class="al-bar-row" data-eq="'+e[0].replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:0;padding:3px 0;cursor:pointer;border-radius:4px;transition:background .12s" title="'+e[0]+': '+e[1]+' รายการ — คลิกเพื่อกรอง">'        +'<div style="width:180px;text-align:right;padding-right:12px;font-size:12px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0">'+e[0]+'</div>'        +'<div style="flex:1;display:flex;align-items:center;gap:8px">'          +'<div style="height:22px;background:'+col+';border-radius:0 4px 4px 0;min-width:4px;width:'+Math.round(pct*0.6)+'px"></div>'          +'<span style="font-size:12px;font-weight:700;font-family:var(--mo);color:'+col+'">'+e[1]+'</span>'        +'</div></div>';
+      var rowHtml='<div class="al-bar-row" data-eq="'+e[0].replace(/"/g,'&quot;')+'" style="display:flex;align-items:center;gap:0;padding:3px 0;cursor:pointer;border-radius:4px;transition:background .12s" title="'+e[0]+': '+e[1]+' รายการ — คลิกเพื่อกรอง">'        +'<div style="width:180px;text-align:right;padding-right:12px;font-size:12px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0">'+e[0]+'</div>'        +'<div style="flex:1;display:flex;align-items:center;gap:8px">'          +'<div style="height:22px;background:'+col+';border-radius:0 4px 4px 0;min-width:4px;width:'+Math.round(pct*0.6)+'px"></div>'          +'<span style="font-size:12px;font-weight:700;font-family:var(--mo);color:'+col+'">'+e[1]+'</span>'        +'</div>'        +'<button type="button" class="al-bar-toggle" aria-label="ดูแยกตามแผนก" style="border:none;background:transparent;color:var(--mu);cursor:pointer;padding:2px 10px;font-size:11px;line-height:1;flex-shrink:0;min-width:24px;text-align:center">▼</button>'        +'</div>';
+
+      // ── breakdown panel (ซ่อนไว้ก่อน) — แสดงครบทุกแผนก ──
+      var deptMap=deptByEq[e[0]]||{};
+      var deptArr=Object.entries(deptMap).sort(function(a,b){return b[1]-a[1];});
+      var detailHtml='';
+      if(deptArr.length){
+        var maxDeptVal=deptArr[0][1]||1;
+        detailHtml='<div class="al-bar-detail" style="display:none;padding:8px 0 10px 12px;border-left:2px solid '+col+';margin-left:2px;margin-bottom:4px;opacity:.85">'          +'<div style="font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">แยกตามแผนก</div>'          +deptArr.map(function(d){
+            var dPct=maxDeptVal>0?d[1]/maxDeptVal*100:0;
+            return'<div style="display:flex;align-items:center;gap:8px;padding:2px 0">'              +'<div style="width:110px;font-size:11px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+d[0]+'">'+d[0]+'</div>'              +'<div style="flex:1;display:flex;align-items:center;gap:6px">'                +'<div style="height:14px;background:'+col+';opacity:.45;border-radius:0 3px 3px 0;min-width:3px;width:'+Math.round(dPct*0.55)+'px"></div>'                +'<span style="font-size:11px;font-family:var(--mo);color:'+col+'">'+d[1]+'</span>'              +'</div></div>';
+          }).join('')        +'</div>';
+      }
+      return rowHtml+detailHtml;
     }).join('');
-    barChartHtml2='<div id="alBarCont" style="padding:8px 0">'+barRows2+'</div>'      +'<div style="font-size:11px;color:var(--mu);margin-top:4px;padding-left:180px">💡 คลิกที่แถวเพื่อกรองตารางด้านล่าง</div>';
+    barChartHtml2='<div id="alBarCont" style="padding:8px 0">'+barRows2+'</div>'      +'<div style="font-size:11px;color:var(--mu);margin-top:4px;padding-left:180px">💡 คลิกที่แถว = กรองตารางด้านล่าง · คลิก ▼ = ดูแยกตามแผนก</div>';
   }
   var alFilters=[];
   if(fDateS||fDateE)alFilters.push('📅 '+(fDateS||'...')+' – '+(fDateE||'...'));
@@ -4924,9 +4946,22 @@ async function renderSum(r){
     });
   },80);
 
-  // ── bar row click: filter ตาราง ──
+  // ── bar row click: filter ตาราง (+ toggle แยกตามแผนก) ──
   if(sc._barh)sc.removeEventListener('click',sc._barh);
   sc._barh=function(e){
+    // ── คลิกลูกศร: toggle panel แยกตามแผนก ไม่ trigger filter ──
+    var toggle=e.target.closest('.al-bar-toggle');
+    if(toggle){
+      e.stopPropagation();
+      var row=toggle.closest('.al-bar-row');
+      var detail=row&&row.nextElementSibling;
+      if(detail&&detail.classList.contains('al-bar-detail')){
+        var isHidden=detail.style.display==='none';
+        detail.style.display=isHidden?'block':'none';
+        toggle.textContent=isHidden?'▲':'▼';
+      }
+      return;
+    }
     var row=e.target.closest('.al-bar-row');if(!row)return;
     var eq=row.dataset.eq;if(!eq)return;
     // highlight selected bar
@@ -6423,8 +6458,8 @@ function getPageData(page){
       else if(sf==='TRANSFERRED'){if(!(item.borrow&&Array.isArray(item.borrow.TransferHistory)&&item.borrow.TransferHistory.length>0))return false;}
       else if(sf&&item.status!==sf)return false;
       if(feq&&S(item.eq.name)!==feq)return false;if(fdept&&S(item.loan.DeptName)!==fdept)return false;
-      // ใช้ return_date สำหรับ RETURNED/ACC_PENDING, loan_date สำหรับสถานะอื่น (ตรงกับ _getRecGroups)
-      var isRet=item.status==='RETURNED'||item.status==='ACC_PENDING';
+      // เลือก date field ตาม sf (สถานะที่ผู้ใช้กรอง) — ตรงกับ _getRecGroups
+      var isRet=sf==='RETURNED'||sf==='ACC_PENDING';
       var dateVal=isRet&&item.borrow&&item.borrow.ReturnDate?item.borrow.ReturnDate:item.loan.LoanDate;
       if(ds&&dateVal&&dateVal<ds)return false;if(de&&dateVal&&dateVal>de)return false;
       var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');return!search||txt.toLowerCase().includes(search);}));
