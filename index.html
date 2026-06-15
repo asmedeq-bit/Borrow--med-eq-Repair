@@ -537,19 +537,6 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   </div>
 </div>
 
-<!-- ══ LOGOUT BUTTON — มุมขวาบน แสดงทุกหน้าหลัง login ═══════ -->
-<div id="logoutBtnWrap" style="display:none;position:fixed;top:10px;right:10px;z-index:1000">
-  <button id="logoutBtn" onclick="doLogout()" title="ออกจากระบบ (เครื่องนี้เท่านั้น)"
-    style="display:flex;align-items:center;gap:6px;padding:7px 12px;
-           background:var(--s2);border:1px solid var(--bd);border-radius:8px;
-           color:var(--mu);font-size:12px;font-weight:600;cursor:pointer;
-           font-family:var(--fn);transition:.15s"
-    onmouseover="this.style.color='var(--er)';this.style.borderColor='var(--er)'"
-    onmouseout="this.style.color='var(--mu)';this.style.borderColor='var(--bd)'">
-    🚪 ออกจากระบบ
-  </button>
-</div>
-
 <style>
 @keyframes loginShake{
   0%,100%{transform:translateX(0)}
@@ -652,6 +639,17 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
     <div class="nt" onclick="showPg('sum',this)">📈 สถิติ</div>
     <div class="nt admin-tab" onclick="showPg('admin',this)">⚙️ Admin</div>
     <div class="nt" onclick="showPg('manual',this)" style="color:#00c8ff;font-weight:700">📖 คู่มือ</div>
+  </div>
+  <div id="logoutBtnWrap" style="display:none;flex-shrink:0">
+    <button id="logoutBtn" onclick="doLogout()" title="ออกจากระบบ (เครื่องนี้เท่านั้น)"
+      style="display:flex;align-items:center;gap:5px;padding:11px 12px;
+             background:transparent;border:none;border-left:1px solid var(--bd);
+             color:var(--mu);font-size:12px;font-weight:600;cursor:pointer;
+             font-family:var(--fn);transition:.15s;white-space:nowrap"
+      onmouseover="this.style.color='var(--er)'"
+      onmouseout="this.style.color='var(--mu)'">
+      🚪 ออกจากระบบ
+    </button>
   </div>
 </nav>
 <div class="tw" id="tw"></div>
