@@ -973,6 +973,36 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   </div>
 
   <div id="sumCont"></div>
+
+
+  <div class="card" style="margin-top:16px">
+    <div class="ctitle">📊 เปรียบเทียบรายปี / รายเดือน</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <select id="cmpEq" onchange="_cmpDraw()" style="min-width:160px"></select>
+      <select id="cmpMode" onchange="_cmpDraw()" style="min-width:190px">
+        <option value="monthly">รายเดือน เทียบปีต่อปี</option>
+        <option value="yearly">รายปี ภาพรวม</option>
+      </select>
+    </div>
+    <div id="cmpKpi" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:14px"></div>
+    <div style="font-size:11px;color:var(--mu);margin-bottom:6px;display:flex;gap:12px;flex-wrap:wrap" id="cmpLeg"></div>
+    <div style="background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--mu);margin-bottom:8px" id="cmpT1"></div>
+      <div style="position:relative;height:220px"><canvas id="cmpC1" role="img" aria-label="กราฟค่าเฉลี่ยการใช้งานเครื่องมือ"></canvas></div>
+    </div>
+    <div style="background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--mu);margin-bottom:8px" id="cmpT2"></div>
+      <div style="position:relative;height:220px"><canvas id="cmpC2" role="img" aria-label="กราฟจำนวนการยืม"></canvas></div>
+    </div>
+    <div style="background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--mu);margin-bottom:8px">เปรียบเทียบทุกเครื่องมือ ทุกปี — คลิกแถวเพื่อเลือก</div>
+      <div style="overflow-x:auto"><table id="cmpBigTbl" style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap"></table></div>
+    </div>
+    <div style="background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:12px 14px">
+      <div style="font-size:11px;color:var(--mu);margin-bottom:8px">ค่าเฉลี่ยรายเดือน — ทุกปีเปรียบกัน</div>
+      <div style="overflow-x:auto"><table id="cmpMthTbl" style="width:100%;border-collapse:collapse;font-size:11px"></table></div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
@@ -2796,7 +2826,7 @@ async function loadAll(){
     renderRec();renderAll();renderDaily();updateDash();
     // ถ้าหน้าสถิติเปิดอยู่ตอน loadAll เสร็จ → load ทันที
     if(document.getElementById('pg-sum')&&document.getElementById('pg-sum').classList.contains('on')){
-      loadSum().then(function(){startSumRealtime();});
+      loadSum().then(function(){startSumRealtime();setTimeout(function(){if(typeof _cmpInit==='function')_cmpInit();},100);});
     }
     if(document.getElementById('adm-loan-mgr')&&document.getElementById('adm-loan-mgr').classList.contains('on'))renderAdminLoans();
     if(document.getElementById('adm-borrow-mgr')&&document.getElementById('adm-borrow-mgr').classList.contains('on'))renderAdminBorrows();
@@ -3748,7 +3778,7 @@ async function renderSum(r){
     var _snapQS='select=snapshot_date,equipment_name,active_count'
       +'&snapshot_date=gte.'+computeRangeS
       +'&snapshot_date=lte.'+computeRangeE
-      +'&order=snapshot_date.asc&limit=2000';
+      +'&order=snapshot_date.asc&limit=50000';
     var _snapRes=await SB._fetch(SUPABASE_URL+'/rest/v1/daily_snapshots?'+_snapQS,{
       headers:SB.headers()
     });
@@ -4699,7 +4729,7 @@ async function renderSum(r){
         +'<div class="ctitle" style="margin:0">🏥 การยืมแยกตามแผนก × ชนิดเครื่องมือ</div>'
         +'<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'
           +'<button class="btn bg sm" id="'+_dpUID+'_csvbtn" style="font-size:11px">CSV</button>'
-          +'<button id="'+_dpUID+'_toggle" class="btn bg sm" style="font-size:11px" onclick="(function(){var b=document.getElementById(\''+_dpUID+'_body\');var t=document.getElementById(\''+_dpUID+'_toggle\');if(b.style.display===\'none\'){b.style.display=\'\';t.textContent=\'▲ ซ่อน\';}else{b.style.display=\'none\';t.textContent=\'▼ แสดง\';}})()">▲ ซ่อน</button>'
+          +'<button id="'+_dpUID+'_toggle" class="btn bg sm" style="font-size:11px" onclick="(function(){var b=document.getElementById(\''+_dpUID+'_body\');var t=document.getElementById(\''+_dpUID+'_toggle\');if(b.style.display===\'none\'){b.style.display=\'\';t.textContent=\'▲ ซ่อน\';}else{b.style.display=\'none\';t.textContent=\'▼ แสดง\';}})()">▼ แสดง</button>'
         +'</div>'
       +'</div>'
       // filter bar
@@ -4717,7 +4747,7 @@ async function renderSum(r){
         +'<select id="'+_dpUID+'_eq" onchange="window._dpState.eq=this.value;window._dpRender&&window._dpRender();" style="font-size:11px;padding:3px 6px;background:var(--bg);border:0.5px solid var(--bd);border-radius:4px;color:var(--tx)">'+eqOpts+'</select>'
       +'</div>'
       // body (render แยก)
-      +'<div id="'+_dpUID+'_body"><div style="text-align:center;padding:20px;color:var(--mu)"><div class="spin"></div></div></div>'
+      +'<div id="'+_dpUID+'_body" style="display:none"><div style="text-align:center;padding:20px;color:var(--mu)"><div class="spin"></div></div></div>'
     +'</div>';
 
     // render ครั้งแรก + ผูก CSV export หลัง DOM พร้อม
@@ -5037,6 +5067,8 @@ async function renderSum(r){
   var _pendingCharts=window._ucDrawPending||{};
   window._ucDrawPending={};
 
+  window._cmpSnap=dailyActiveByEq;
+
   sc.innerHTML=chartHtml+_daySumHtml+dayTableHtml+avgHtml+_hfncSetHtml+origHtml+allLoansHtml;
 
   // ── draw utilization charts หลัง innerHTML set เสร็จ (canvas อยู่ใน DOM แล้ว) ──
@@ -5187,6 +5219,188 @@ async function renderSum(r){
   sc.addEventListener('mouseover',sc._barmoh);
   sc.addEventListener('mouseout',sc._barmol);
 }
+
+
+// ══ เปรียบเทียบรายปี / รายเดือน ════════════════════════════
+// อ่านจาก window._cmpSnap (set ก่อน sc.innerHTML= โดย renderSum)
+// และ expanded() / EQL / esc() / S() ที่อยู่ใน scope อยู่แล้ว
+// ไม่มี Supabase API call เพิ่ม ไม่แก้ renderSum
+// localStorage keys ใช้ prefix meq_ ตาม pattern เดิม
+// ─────────────────────────────────────────────────────────────
+var _cmpCharts={};
+function _cmpDestroy(id){if(_cmpCharts[id]){try{_cmpCharts[id].destroy();}catch(e){}delete _cmpCharts[id];}}
+function _cmpMk(id,cfg){_cmpDestroy(id);var el=document.getElementById(id);if(!el||!window.Chart)return;try{_cmpCharts[id]=new window.Chart(el,cfg);}catch(e){console.warn('[cmp]',e);}}
+function _cmpYears(){
+  var snap=window._cmpSnap||{};var items=expanded();var yrs={};
+  Object.values(snap).forEach(function(dm){Object.keys(dm).forEach(function(d){if(d)yrs[d.substring(0,4)]=1;});});
+  items.forEach(function(i){var d=i.loan.LoanDate||'';if(d.length>=4)yrs[d.substring(0,4)]=1;});
+  return Object.keys(yrs).sort();
+}
+function _cmpAvgByMonth(eqName,yr){
+  var dayData=(window._cmpSnap||{})[eqName]||{};
+  var tot=Array(12).fill(null),cnt=Array(12).fill(0);
+  Object.keys(dayData).forEach(function(d){
+    if(d.substring(0,4)!==yr)return;
+    var m=parseInt(d.substring(5,7),10)-1;if(m<0||m>11)return;
+    if(tot[m]===null)tot[m]=0;tot[m]+=dayData[d];cnt[m]++;
+  });
+  return tot.map(function(v,i){return(v!==null&&cnt[i]>0)?Math.round(v/cnt[i]*10)/10:null;});
+}
+function _cmpLoanByMonth(eqName,yr){
+  var byMonth=Array(12).fill(null);
+  expanded().forEach(function(item){
+    if(S(item.eq.name)!==eqName||item.status==='CANCELLED')return;
+    var d=item.loan.LoanDate||'';
+    if(d.substring(0,4)!==yr)return;
+    var m=parseInt(d.substring(5,7),10)-1;if(m<0||m>11)return;
+    if(byMonth[m]===null)byMonth[m]=0;byMonth[m]++;
+  });
+  return byMonth;
+}
+function _cmpDraw(){
+  if(!loans)return;
+  var eqEl=document.getElementById('cmpEq');if(!eqEl)return;
+  var eqName=eqEl.value||'';
+  var modeEl=document.getElementById('cmpMode');var mode=modeEl?modeEl.value:'monthly';
+  if(eqName)localStorage.setItem('meq_cmp_eq',eqName);
+  localStorage.setItem('meq_cmp_mode',mode);
+  var yrs=_cmpYears();if(!yrs.length)return;
+  var MO=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  var CLR=['#378ADD','#1D9E75','#D85A30','#BA7517','#A32D2D'];
+  var DASH=[[],[6,3],[2,3],[8,4],[4,4]];
+  var GC='rgba(128,128,128,0.1)';
+  var TC='#8b949e';
+
+  // ─── KPI cards ───
+  var kpiEl=document.getElementById('cmpKpi');
+  if(kpiEl){
+    var kh='';var pA=null;var pC=null;
+    yrs.forEach(function(yr,i){
+      var aArr=_cmpAvgByMonth(eqName,yr);
+      var cArr=_cmpLoanByMonth(eqName,yr);
+      var aVals=aArr.filter(function(v){return v!==null;});
+      var cVals=cArr.filter(function(v){return v!==null;});
+      var avgA=aVals.length?Math.round(aVals.reduce(function(a,b){return a+b;},0)/aVals.length*10)/10:null;
+      var sumC=cVals.length?cVals.reduce(function(a,b){return a+b;},0):null;
+      var dA=(pA!==null&&avgA!==null)?Math.round((avgA-pA)*10)/10:null;
+      var dC=(pC!==null&&sumC!==null)?(sumC-pC):null;
+      kh+='<div style="background:var(--s2);border-radius:6px;padding:9px 11px;border-left:3px solid '+CLR[Math.min(i,4)]+'">'
+        +'<div style="font-size:10px;color:var(--mu)">ปี '+(parseInt(yr)+543)+'</div>'
+        +'<div style="font-size:16px;font-weight:700;font-family:var(--mo);color:var(--ac);margin-top:3px">'+(avgA!==null?avgA:'—')+'</div>'
+        +'<div style="font-size:10px;color:var(--mu)">เครื่อง/วัน</div>'
+        +(dA!==null?'<div style="font-size:10px;color:'+(dA>=0?'var(--ok)':'var(--er)')+';">+'+(dA>=0?'+':'')+dA+' จากปีก่อน</div>':'')
+        +'<div style="margin-top:5px;font-size:13px;font-weight:700;font-family:var(--mo);color:var(--tx)">'+(sumC!==null?sumC.toLocaleString():'—')+'</div>'
+        +'<div style="font-size:10px;color:var(--mu)">ครั้งยืม</div>'
+        +(dC!==null?'<div style="font-size:10px;color:'+(dC>=0?'var(--ok)':'var(--er)')+';">'+(dC>=0?'+':'')+dC+' จากปีก่อน</div>':'')
+        +'</div>';
+      pA=avgA;pC=sumC;
+    });
+    kpiEl.innerHTML=kh;
+  }
+
+  // ─── legend ───
+  var legEl=document.getElementById('cmpLeg');
+  if(legEl)legEl.innerHTML=yrs.map(function(yr,i){
+    return '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--mu)"><span style="display:inline-block;width:18px;height:2px;background:'+CLR[Math.min(i,4)]+'"></span>'+(parseInt(yr)+543)+'</span>';
+  }).join('');
+
+  // ─── chart title ───
+  var t1El=document.getElementById('cmpT1');if(t1El)t1El.textContent=eqName+' — ค่าเฉลี่ยแสดง (เครื่อง/วัน)';
+  var t2El=document.getElementById('cmpT2');if(t2El)t2El.textContent=eqName+' — จำนวนการยืม (ครั้ง)';
+
+  // ─── charts ───
+  if(mode==='monthly'){
+    _cmpMk('cmpC1',{type:'line',data:{labels:MO,datasets:yrs.map(function(yr,i){return{label:(parseInt(yr)+543)+'',data:_cmpAvgByMonth(eqName,yr),borderColor:CLR[Math.min(i,4)],backgroundColor:CLR[Math.min(i,4)]+'22',borderDash:DASH[Math.min(i,4)],borderWidth:2,pointRadius:3,tension:0.3,spanGaps:false};})},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{autoSkip:false,maxRotation:0,font:{size:10},color:TC},grid:{color:GC}},y:{title:{display:true,text:'เครื่อง/วัน',font:{size:10},color:TC},beginAtZero:false,ticks:{color:TC},grid:{color:GC}}}}});
+    _cmpMk('cmpC2',{type:'bar',data:{labels:MO,datasets:yrs.map(function(yr,i){return{label:(parseInt(yr)+543)+'',data:_cmpLoanByMonth(eqName,yr),backgroundColor:CLR[Math.min(i,4)]+'99',borderColor:CLR[Math.min(i,4)],borderWidth:1};})},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{autoSkip:false,maxRotation:0,font:{size:10},color:TC},grid:{display:false}},y:{title:{display:true,text:'ครั้ง',font:{size:10},color:TC},beginAtZero:true,ticks:{color:TC},grid:{color:GC}}}}});
+  }else{
+    var yrLbls=yrs.map(function(yr){return(parseInt(yr)+543)+'';});
+    var yrAvg=yrs.map(function(yr){var a=_cmpAvgByMonth(eqName,yr).filter(function(v){return v!==null;});return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*10)/10:null;});
+    var yrCnt=yrs.map(function(yr){var a=_cmpLoanByMonth(eqName,yr).filter(function(v){return v!==null;});return a.length?a.reduce(function(x,y){return x+y;},0):null;});
+    _cmpMk('cmpC1',{type:'bar',data:{labels:yrLbls,datasets:[{data:yrAvg,backgroundColor:yrs.map(function(_,i){return CLR[Math.min(i,4)]+'bb';}),borderColor:yrs.map(function(_,i){return CLR[Math.min(i,4)];}),borderWidth:1.5,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'เครื่อง/วัน',font:{size:10},color:TC},beginAtZero:true,ticks:{color:TC},grid:{color:GC}},x:{ticks:{color:TC}}}}});
+    _cmpMk('cmpC2',{type:'bar',data:{labels:yrLbls,datasets:[{data:yrCnt,backgroundColor:yrs.map(function(_,i){return CLR[Math.min(i,4)]+'bb';}),borderColor:yrs.map(function(_,i){return CLR[Math.min(i,4)];}),borderWidth:1.5,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{title:{display:true,text:'ครั้ง',font:{size:10},color:TC},beginAtZero:true,ticks:{color:TC},grid:{color:GC}},x:{ticks:{color:TC}}}}});
+  }
+
+  // ─── ตารางใหญ่: ทุกเครื่องมือ × ทุกปี ───
+  var bigEl=document.getElementById('cmpBigTbl');
+  if(bigEl){
+    var eqHasData=EQL.filter(function(e2){
+      return yrs.some(function(yr){return _cmpAvgByMonth(e2,yr).some(function(v){return v!==null;})||_cmpLoanByMonth(e2,yr).some(function(v){return v!==null;});});
+    });
+    var h='<tr style="background:var(--s2)"><th style="padding:5px 8px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap">เครื่องมือ</th>';
+    yrs.forEach(function(yr,i){
+      h+='<th colspan="2" style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);white-space:nowrap;color:'+CLR[Math.min(i,4)]+'">'+(parseInt(yr)+543)+'</th>';
+      if(i<yrs.length-1)h+='<th style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);font-size:10px;color:var(--mu)">เทรนด์</th>';
+    });
+    h+='</tr><tr style="background:var(--s2)"><th style="padding:3px 8px;border-bottom:1px solid var(--bd)"></th>';
+    yrs.forEach(function(yr,i){
+      h+='<th style="padding:3px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);font-size:10px;font-weight:400;color:var(--mu)">เฉลี่ย/วัน</th>'
+        +'<th style="padding:3px 8px;text-align:center;border-bottom:1px solid var(--bd);font-size:10px;font-weight:400;color:var(--mu)">ยืม</th>';
+      if(i<yrs.length-1)h+='<th style="padding:3px 8px;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd)"></th>';
+    });
+    h+='</tr>';
+    var rows='';
+    eqHasData.forEach(function(eq2){
+      rows+='<tr onclick="document.getElementById(\'cmpEq\').value=\''+esc(eq2)+'\';_cmpDraw();" style="cursor:pointer" onmouseover="this.style.background=\'rgba(0,200,255,.05)\'" onmouseout="this.style.background=\'\'"><td style="padding:4px 8px;border-bottom:1px solid var(--bd);white-space:nowrap;font-size:12px;color:var(--mu)">'+esc(eq2)+'</td>';
+      var pA2=null;
+      yrs.forEach(function(yr,i){
+        var aArr2=_cmpAvgByMonth(eq2,yr).filter(function(v){return v!==null;});
+        var cArr2=_cmpLoanByMonth(eq2,yr).filter(function(v){return v!==null;});
+        var avgA2=aArr2.length?Math.round(aArr2.reduce(function(a,b){return a+b;},0)/aArr2.length*10)/10:null;
+        var sumC2=cArr2.length?cArr2.reduce(function(a,b){return a+b;},0):null;
+        rows+='<td style="padding:4px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);font-family:var(--mo);font-size:12px;color:var(--ac)">'+(avgA2!==null?avgA2:'—')+'</td>';
+        rows+='<td style="padding:4px 8px;text-align:center;border-bottom:1px solid var(--bd);font-family:var(--mo);font-size:12px;color:var(--tx)">'+(sumC2!==null?sumC2.toLocaleString():'—')+'</td>';
+        if(i<yrs.length-1){
+          var tr2='—';
+          var nArr=_cmpAvgByMonth(eq2,yrs[i+1]).filter(function(v){return v!==null;});
+          var nA2=nArr.length?Math.round(nArr.reduce(function(a,b){return a+b;},0)/nArr.length*10)/10:null;
+          if(avgA2!==null&&nA2!==null){var d2=Math.round((nA2-avgA2)*10)/10;tr2='<span style="color:'+(d2>0?'var(--ok)':d2<0?'var(--er)':'var(--mu)')+'">'+( d2>0?'▲':d2<0?'▼':'=')+(d2!==0?' '+Math.abs(d2):'')+' </span>';}
+          rows+='<td style="padding:4px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd)">'+tr2+'</td>';
+        }
+        pA2=avgA2;
+      });
+      rows+='</tr>';
+    });
+    bigEl.innerHTML=h+rows;
+  }
+
+  // ─── ตารางรายเดือน ───
+  var mthEl=document.getElementById('cmpMthTbl');
+  if(mthEl){
+    var h2='<tr style="background:var(--s2)"><th style="padding:5px 8px;text-align:left;border-bottom:1px solid var(--bd);font-weight:400;color:var(--mu)">เดือน</th>';
+    yrs.forEach(function(yr,i){h2+='<th colspan="2" style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);color:'+CLR[Math.min(i,4)]+'">'+(parseInt(yr)+543)+'</th>';});
+    h2+='<th style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);font-size:10px;font-weight:400;color:var(--mu)">เทรนด์</th></tr>';
+    h2+='<tr style="background:var(--s2)"><th style="padding:3px 8px;border-bottom:1px solid var(--bd)"></th>';
+    yrs.forEach(function(){h2+='<th style="padding:3px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);font-size:10px;font-weight:400;color:var(--mu)">เฉลี่ย</th><th style="padding:3px 8px;text-align:center;border-bottom:1px solid var(--bd);font-size:10px;font-weight:400;color:var(--mu)">ยืม</th>';});
+    h2+='<th style="border-bottom:1px solid var(--bd)"></th></tr>';
+    var rows2='';
+    MO.forEach(function(m,mi){
+      rows2+='<tr><td style="padding:4px 8px;border-bottom:1px solid var(--bd);font-size:12px;color:var(--mu)">'+m+'</td>';
+      var fA=null,lA=null;
+      yrs.forEach(function(yr){
+        var a=(_cmpAvgByMonth(eqName,yr)||[])[mi];
+        var c=(_cmpLoanByMonth(eqName,yr)||[])[mi];
+        rows2+='<td style="padding:4px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd);font-family:var(--mo);font-size:12px;color:'+(a!==null?'var(--ac)':'var(--mu)')+'">'+(a!==null?a:'—')+'</td>';
+        rows2+='<td style="padding:4px 8px;text-align:center;border-bottom:1px solid var(--bd);font-family:var(--mo);font-size:12px;color:'+(c!==null?'var(--tx)':'var(--mu)')+'">'+(c!==null?c:'—')+'</td>';
+        if(fA===null&&a!==null)fA=a;if(a!==null)lA=a;
+      });
+      var tr3='—';
+      if(fA!==null&&lA!==null&&fA!==lA){var d3=Math.round((lA-fA)*10)/10;tr3='<span style="color:'+(d3>0?'var(--ok)':'var(--er)')+'">'+( d3>0?'▲':'▼')+Math.abs(d3)+'</span>';}
+      rows2+='<td style="padding:4px 8px;text-align:center;border-bottom:1px solid var(--bd);border-left:1px solid var(--bd)">'+tr3+'</td></tr>';
+    });
+    mthEl.innerHTML=h2+rows2;
+  }
+}
+function _cmpInit(){
+  var eqSel=document.getElementById('cmpEq');if(!eqSel)return;
+  eqSel.innerHTML='';
+  EQL.forEach(function(e){eqSel.innerHTML+='<option value="'+esc(e)+'">'+esc(e)+'</option>';});
+  var se=localStorage.getItem('meq_cmp_eq');var sm=localStorage.getItem('meq_cmp_mode');
+  if(se){var op=eqSel.querySelector('option[value="'+se.replace(/["]/g,'&quot;')+'"]');if(op)eqSel.value=se;}
+  else if(EQL.length){eqSel.value=EQL[0];}
+  var mEl=document.getElementById('cmpMode');if(mEl&&sm)mEl.value=sm;
+  _cmpDraw();
+}
+
 
 function alClearEqFilter(){
   var tbody=document.getElementById('alTbody');
@@ -6724,13 +6938,13 @@ function showPg(page,el){
   if(page!=='sum'&&window.stopSumRealtime)stopSumRealtime();
   if(loans===null){
     loadAll().then(function(){
-      if(page==='sum'){initSumFilters();loadSum().then(function(){startSumRealtime();});}
+      if(page==='sum'){initSumFilters();loadSum().then(function(){startSumRealtime();setTimeout(function(){if(typeof _cmpInit==='function')_cmpInit();},100);});}
     });
     return;
   }
   if(page==='dash')updateDash();
   else if(page==='daily')renderDaily();
-  else if(page==='sum'){initSumFilters();loadSum().then(function(){startSumRealtime();});}
+  else if(page==='sum'){initSumFilters();loadSum().then(function(){startSumRealtime();setTimeout(function(){if(typeof _cmpInit==='function')_cmpInit();},100);});}
   else if(page==='rec'){
     var _rs=document.getElementById('recStat');
     if(_rs&&_rs.value==='')_rs.value='PENDING_ACTIVE';
