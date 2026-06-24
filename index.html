@@ -4798,7 +4798,202 @@ async function renderSum(r){
     },80);
   })();
 
-  var origHtml=(window._omHtml||'')+(window._eqdHtml||'')+(window._cirHtml||'')+(window._dpHtml||'');
+
+  // ── section 5: เครื่อง Ventilator/HFNC ใช้ต่อเนื่องนาน (ทุกสถานะ ย้อนหลัง 5 เดือน) ──
+  // ── ข้อมูล: expanded() ที่โหลดมาแล้ว ไม่มี API call เพิ่ม ────────────────────────────
+  // ── localStorage key: meq_streak_thresh (prefix meq_ ตาม pattern เดิม) ──────────────
+  (function(){
+    var STREAK_EQ=['Ventilator','Ventilator transfer','HFNC','HFNC transfer'];
+    var THRESH_KEY='meq_streak_thresh';
+    var savedThresh=parseInt(localStorage.getItem(THRESH_KEY)||'30',10);
+    if(savedThresh!==25&&savedThresh!==30)savedThresh=30;
+    window._streakThresh=savedThresh;
+    var TYPE_KEY='meq_streak_type';
+    var savedType=localStorage.getItem(TYPE_KEY)||'all';
+    if(['all','vent','hfnc'].indexOf(savedType)<0)savedType='all';
+    window._streakType=savedType;
+
+    var _sUID='streak_'+Math.random().toString(36).substr(2,6);
+
+    // ── กรอบเวลา 5 เดือนย้อนหลัง ──
+    var WINDOW_MS=5*30*24*3600*1000;
+    var cutoffDate=new Date(now.getTime()-WINDOW_MS);
+    var cutoffStr=cutoffDate.toISOString().split('T')[0];
+
+    // ── buildStreak: ทุกสถานะ ย้อนหลัง 5 เดือน ──
+    function buildStreak(thresh){
+      var allExp=expanded();
+
+      // กรอง: Ventilator/HFNC + loan_date >= 5 เดือนที่แล้ว + มี borrow record
+      var items=allExp.filter(function(item){
+        if(!item.borrow)return false;
+        if(item.status==='CANCELLED')return false;
+        var nm=S(item.eq.name);
+        if(STREAK_EQ.indexOf(nm)<0)return false;
+        var ld=item.loan.LoanDate||'';
+        if(ld<cutoffStr)return false;
+        var tp=window._streakType||'all';
+        if(tp==='vent'&&nm.indexOf('HFNC')>=0)return false;
+        if(tp==='hfnc'&&nm.indexOf('HFNC')<0)return false;
+        return true;
+      });
+
+      // คำนวณวันใช้งาน = LoanDate → ReturnDate (ถ้าคืนแล้ว) หรือ LoanDate → ตอนนี้
+      // key = eqNo เพื่อรวมเครื่องเดียวกันที่โอนแผนก
+      // แถวหลักแสดงข้อมูลของ record ที่นานสุดทั้งหมด (ไม่ mix field จาก 2 record)
+      var machines={};
+      items.forEach(function(item){
+        var ld=item.loan.LoanDate;if(!ld)return;
+        var isActive=item.status==='ACTIVE'||item.status==='ACC_PENDING';
+        var endDate=(!isActive&&item.borrow.ReturnDate)?new Date(item.borrow.ReturnDate):now;
+        var d=Math.round((endDate-new Date(ld))/86400000);
+        if(d<thresh)return;
+        var eqNo=S(item.borrow.EquipmentNo)||'—';
+        if(!eqNo||eqNo==='—'||eqNo==='-')return;
+        var key=eqNo;
+        var rd=(!isActive&&item.borrow.ReturnDate)?item.borrow.ReturnDate:'';
+        // เก็บ record ที่นานสุดทั้งก้อน (ทุก field มาจาก record เดียวกัน)
+        if(!machines[key]||d>machines[key].days){
+          machines[key]={
+            eqName:S(item.eq.name),
+            eqNo:eqNo,
+            dept:S(item.loan.DeptName)||'ไม่ระบุ',
+            loanDate:ld,
+            returnDate:rd,
+            days:d,
+            isActive:isActive,
+            loanID:S(item.loan.LoanID)
+          };
+        }
+      });
+
+      return Object.values(machines).sort(function(a,b){return b.days-a.days;});
+    }
+
+    // ── ดึงประวัติ 3 ครั้งล่าสุด เฉพาะ record ที่ใช้เกิน threshold ──
+    function getHistory(eqNo,thresh){
+      var allExp=expanded();
+      return allExp.filter(function(item){
+        if(!item.borrow)return false;
+        if(item.status==='CANCELLED')return false;
+        if(S(item.borrow.EquipmentNo)!==eqNo)return false;
+        var nm=S(item.eq.name);
+        if(STREAK_EQ.indexOf(nm)<0)return false;
+        var ld=item.loan.LoanDate||'';
+        if(ld<cutoffStr)return false;
+        var tp2=window._streakType||'all';
+        if(tp2==='vent'&&nm.indexOf('HFNC')>=0)return false;
+        if(tp2==='hfnc'&&nm.indexOf('HFNC')<0)return false;
+        // กรองเฉพาะ record ที่ใช้นานเกิน threshold
+        var isActive=item.status==='ACTIVE'||item.status==='ACC_PENDING';
+        var endDate=(!isActive&&item.borrow.ReturnDate)?new Date(item.borrow.ReturnDate):now;
+        var d=Math.round((endDate-new Date(ld))/86400000);
+        return d>=thresh;
+      }).sort(function(a,b){
+        return new Date(b.loan.LoanDate||'2000-01-01')-new Date(a.loan.LoanDate||'2000-01-01');
+      }).slice(0,3);
+    }
+
+    // ── render ──
+    function renderStreak(thresh){
+      var rows=buildStreak(thresh);
+      var badge=rows.length>0
+        ?'<span style="font-size:11px;font-weight:600;color:var(--er);background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:4px;padding:1px 8px;margin-left:6px">🔴 '+rows.length+' เครื่อง</span>'
+        :'<span style="font-size:11px;font-weight:600;color:var(--ok);margin-left:6px">✅ ไม่มี</span>';
+
+      var tbl='';
+      if(rows.length>0){
+        tbl='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+          +'<thead><tr style="background:var(--s2)">'
+          +'<th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--bd)">หมายเลข</th>'
+          +'<th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--bd)">ชนิด</th>'
+          +'<th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--bd)">แผนก</th>'
+          +'<th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--bd)">วันยืม</th>'
+          +'<th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--bd)">วันคืน</th>'
+          +'<th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--bd)">ใช้งาน</th>'
+          +'<th style="padding:6px 10px;text-align:center;border-bottom:1px solid var(--bd)">สถานะ</th>'
+          +'<th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--bd)">ประวัติ 3 ครั้งล่าสุด (5 เดือน)</th>'
+          +'</tr></thead><tbody>';
+
+        rows.forEach(function(row){
+          var hist=getHistory(row.eqNo,thresh);
+          var histHtml='<div style="display:flex;flex-direction:column;gap:4px">';
+          if(!hist.length){
+            histHtml+='<span style="font-size:10px;color:var(--mu)">ไม่มีประวัติที่ใช้เกิน '+thresh+' วัน ในช่วง 5 เดือน</span>';
+          } else {
+          hist.forEach(function(item,idx){
+            var ld2=item.loan.LoanDate||'—';
+            var isAct2=item.status==='ACTIVE'||item.status==='ACC_PENDING';
+            var rd2=(item.borrow&&item.borrow.ReturnDate)?item.borrow.ReturnDate:'—';
+            var dept2=S(item.loan.DeptName)||'—';
+            var staBadge=isAct2
+              ?'<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(55,138,221,.15);color:var(--ac)">ยืมอยู่</span>'
+              :'<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--s2);color:var(--mu)">คืนแล้ว</span>';
+            var opac=idx===0?'':'opacity:0.6;';
+            histHtml+='<div style="font-size:10px;'+opac+'display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+              +staBadge
+              +'<span style="color:var(--tx);font-weight:'+(idx===0?'500':'400')+'">'+esc(dept2)+'</span>'
+              +'<span style="color:var(--mu)">'+esc(ld2)+' → '+esc(rd2)+'</span>'
+              +'</div>';
+          });
+          }
+          histHtml+='</div>';
+
+          var urgColor=row.days>=45?'var(--er)':'var(--wn)';
+          var urgBg=row.days>=45?'rgba(239,68,68,.06)':'rgba(245,158,11,.06)';
+          var staBadgeRow=row.isActive
+            ?'<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(55,138,221,.15);color:var(--ac);font-weight:600">ยืมอยู่</span>'
+            :'<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(30,180,100,.1);color:var(--ok);font-weight:600">คืนแล้ว</span>';
+          var rdDisplay=row.returnDate
+            ?'<span style="font-size:11px">'+esc(row.returnDate)+'</span>'
+            :'<span style="color:var(--mu);font-size:10px">ยังใช้อยู่</span>';
+
+          tbl+='<tr style="background:'+urgBg+';border-bottom:0.5px solid var(--bd)">'
+            +'<td style="padding:7px 10px;font-family:var(--mo);font-weight:700;font-size:13px;color:var(--ac)">'+esc(row.eqNo)+'</td>'
+            +'<td style="padding:7px 10px;font-size:11px;color:var(--mu)">'+esc(row.eqName)+'</td>'
+            +'<td style="padding:7px 10px;font-size:12px;font-weight:500">'+esc(row.dept)+'</td>'
+            +'<td style="padding:7px 10px;text-align:center;font-size:11px;color:var(--mu)">'+esc(row.loanDate)+'</td>'
+            +'<td style="padding:7px 10px;text-align:center">'+rdDisplay+'</td>'
+            +'<td style="padding:7px 10px;text-align:center;font-weight:700;font-size:14px;color:'+urgColor+'">'+row.days+'<span style="font-size:10px;font-weight:400;color:var(--mu)"> วัน</span></td>'
+            +'<td style="padding:7px 10px;text-align:center">'+staBadgeRow+'</td>'
+            +'<td style="padding:7px 10px">'+histHtml+'</td>'
+            +'</tr>';
+        });
+        tbl+='</tbody></table></div>';
+      }else{
+        tbl='<p style="color:var(--ok);text-align:center;padding:14px;font-size:12px">✅ ไม่มีเครื่องที่ใช้ต่อเนื่องเกิน '+thresh+' วัน (ย้อนหลัง 5 เดือน)</p>';
+      }
+
+      var cont=document.getElementById(_sUID+'_body');
+      if(!cont)return;
+      cont.innerHTML=tbl;
+      var badgeEl=document.getElementById(_sUID+'_badge');
+      if(badgeEl)badgeEl.innerHTML=badge;
+    }
+
+    // ── HTML shell (render ใน setTimeout หลัง DOM พร้อม) ──
+    window._streakHtml='<div class="card">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+          +'<div class="ctitle" style="margin:0">⏱️ เครื่องที่ใช้ต่อเนื่องนาน</div>'
+          +'<span id="'+_sUID+'_badge"></span>'
+        +'</div>'
+        +'<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'
+          +'<select id="'+_sUID+'_type" style="font-size:11px;padding:3px 6px;background:var(--bg);border:0.5px solid var(--bd);border-radius:4px;color:var(--tx)" onchange="(function(){var tp=document.getElementById(\''+_sUID+'_type\').value;localStorage.setItem(\'meq_streak_type\',tp);window._streakType=tp;var th=parseInt(document.getElementById(\''+_sUID+'_thresh\').value,10);window[\'_streakRender_'+_sUID+'\'](th);var _b=document.getElementById(\''+_sUID+'_body\');var _t=document.getElementById(\''+_sUID+'_toggle\');if(_b){_b.style.display=\'\';}if(_t){_t.textContent=\'▲ ซ่อน\';}})()"><option value="all"'+(savedType==='all'?' selected':'')+'>ทั้งหมด</option><option value="vent"'+(savedType==='vent'?' selected':'')+'>Ventilator</option><option value="hfnc"'+(savedType==='hfnc'?' selected':'')+'>HFNC</option></select>'
+          +'<select id="'+_sUID+'_thresh" style="font-size:11px;padding:3px 6px;background:var(--bg);border:0.5px solid var(--bd);border-radius:4px;color:var(--tx)" onchange="(function(){var v=parseInt(document.getElementById(\''+_sUID+'_thresh\').value,10);localStorage.setItem(\'meq_streak_thresh\',v);window._streakThresh=v;(window[\'_streakRender_'+_sUID+'\']&&window[\'_streakRender_'+_sUID+'\'](v));var _b2=document.getElementById(\''+_sUID+'_body\');var _t2=document.getElementById(\''+_sUID+'_toggle\');if(_b2){_b2.style.display=\'\';}if(_t2){_t2.textContent=\'▲ ซ่อน\';}})()"><option value="25"'+(savedThresh===25?' selected':'')+'>เกิน 25 วัน</option><option value="30"'+(savedThresh===30?' selected':'')+'>เกิน 30 วัน</option></select>'
+          +'<button id="'+_sUID+'_toggle" class="btn bg sm" style="font-size:11px" onclick="(function(){var b=document.getElementById(\''+_sUID+'_body\');var t=document.getElementById(\''+_sUID+'_toggle\');if(b.style.display===\'none\'){b.style.display=\'\';t.textContent=\'▲ ซ่อน\';}else{b.style.display=\'none\';t.textContent=\'▼ แสดง\';}})()">▼ แสดง</button>'
+        +'</div>'
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--mu);margin-bottom:8px">Ventilator / HFNC ทุกสถานะ (รวมที่คืนแล้ว) — นับจากวันยืมถึงวันคืน หรือถึงปัจจุบันถ้ายังไม่คืน &nbsp;•&nbsp; 🔴 ≥45 วัน &nbsp;🟡 25–44 วัน</div>'
+      +'<div id="'+_sUID+'_body" style="display:none"><div style="text-align:center;padding:12px;color:var(--mu)"><div class="spin"></div></div></div>'
+    +'</div>';
+
+    window['_streakRender_'+_sUID]=renderStreak;
+    setTimeout(function(){ renderStreak(window._streakThresh||30); },80);
+  })();
+
+
+  var origHtml=(window._omHtml||'')+(window._eqdHtml||'')+(window._cirHtml||'')+(window._streakHtml||'')+(window._dpHtml||'');
 
 
   // ─── allLoansHtml ─────────────────────────────────────────
