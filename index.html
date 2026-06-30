@@ -851,6 +851,7 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
         </select>
       </div>
       <button class="btn bp sm" onclick="loadSum()">🔍 ดู</button>
+      <button class="btn bg sm" onclick="loadSum()" title="โหลดข้อมูลใหม่ (auto-refresh ทุก 30 นาที)">🔄 Refresh</button>
       <button class="btn bg sm" onclick="clearSumFilter()">✕ ล้างทั้งหมด</button>
       <button class="btn bg sm" id="sumFullBtn" title="โหลดข้อมูลทั้งหมดย้อนหลัง 2–3 ปี (ช้ากว่าปกติ ~10 วินาที)" onclick="(function(){
         var btn=document.getElementById('sumFullBtn');
@@ -2653,7 +2654,7 @@ function startSumRealtime(){
     if(pg&&pg.classList.contains('on')){
       renderSum({}); // async — fire and forget OK for timer
     }
-  },300000); // ทุก 5 นาที
+  },1800000); // ทุก 30 นาที
 }
 function stopSumRealtime(){
   if(window._sumRealtimeTimer){clearInterval(window._sumRealtimeTimer);window._sumRealtimeTimer=null;}
