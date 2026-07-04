@@ -4454,7 +4454,7 @@ async function renderSum(r){
     var CIRCUIT_EQ=['Ventilator','Ventilator transfer','HFNC','HFNC transfer'];
     var circuitLocal=[];
     expFiltered.forEach(function(item){
-      if(item.status!=='ACTIVE'&&item.status!=='ACC_PENDING')return;
+      if(item.status!=='ACTIVE')return;
       var eqName=S(item.eq.name);
       if(!CIRCUIT_EQ.some(function(n){return eqName===n;}))return;
       var ld=item.loan.LoanDate;if(!ld)return;
