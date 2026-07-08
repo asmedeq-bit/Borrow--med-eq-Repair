@@ -4,10 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
+<script>(function(){try{var t=localStorage.getItem('meq_theme');if(t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
 <title>ระบบยืมคืนเครื่องมือแพทย์ แผนกบริการเครื่องมือและอุปกรณ์ทางการแพทย์</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d1117;--s1:#161b22;--s2:#1f2937;--bd:#30363d;--ac:#00c8ff;--ac2:#7c3aed;--ok:#10b981;--wn:#f59e0b;--er:#ef4444;--tx:#e6edf3;--mu:#8b949e;--fn:'Sarabun',sans-serif;--mo:'IBM Plex Mono',monospace}
+[data-theme="light"]{--bg:#f4f6f8;--s1:#ffffff;--s2:#f3f4f6;--bd:#e2e5e9;--ac:#0284c7;--ac2:#7c3aed;--ok:#059669;--wn:#b45309;--er:#dc2626;--tx:#1f2937;--mu:#6b7280}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--fn);background:var(--bg);color:var(--tx);min-height:100vh;font-size:14px}
 #cfgBanner{background:rgba(239,68,68,.12);border-bottom:1px solid var(--er);padding:8px 16px;font-size:12px;color:var(--er);display:none;text-align:center}
@@ -641,6 +643,13 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
     <div class="nt admin-tab" onclick="showPg('admin',this)">⚙️ Admin</div>
     <div class="nt" onclick="showPg('manual',this)" style="color:#00c8ff;font-weight:700">📖 คู่มือ</div>
   </div>
+  <button id="themeToggleBtn" onclick="toggleTheme()" title="สลับโหมดสี"
+    style="display:flex;align-items:center;justify-content:center;flex-shrink:0;
+           padding:0 12px;height:100%;background:transparent;border:none;
+           border-left:1px solid var(--bd);color:var(--mu);font-size:14px;
+           cursor:pointer;transition:.15s"
+    onmouseover="this.style.color='var(--ac)'"
+    onmouseout="this.style.color='var(--mu)'">🌙</button>
   <div id="logoutBtnWrap" style="display:none;flex-shrink:0">
     <button id="logoutBtn" onclick="doLogout()" title="ออกจากระบบ (เครื่องนี้เท่านั้น)"
       style="display:flex;align-items:center;gap:5px;padding:11px 12px;
@@ -653,6 +662,20 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
     </button>
   </div>
 </nav>
+<script>
+function toggleTheme(){
+  var html=document.documentElement;
+  var cur=html.getAttribute('data-theme')==='light'?'light':'dark';
+  var next=cur==='light'?'dark':'light';
+  if(next==='light')html.setAttribute('data-theme','light');else html.removeAttribute('data-theme');
+  try{localStorage.setItem('meq_theme',next);}catch(e){}
+  document.getElementById('themeToggleBtn').textContent=next==='light'?'☀️':'🌙';
+}
+(function(){
+  var isLight=document.documentElement.getAttribute('data-theme')==='light';
+  document.getElementById('themeToggleBtn').textContent=isLight?'☀️':'🌙';
+})();
+</script>
 <div class="tw" id="tw"></div>
 
 <!-- LOAN PAGE -->
@@ -947,6 +970,17 @@ from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
             <option value="">— ตาม Global —</option>
           </select>
           <button class="btn bg sm" style="font-size:10px;padding:3px 7px" onclick="['secOvDept','secOvEq'].forEach(function(id){document.getElementById(id).value='';});renderSum({})">✕</button>
+        </div>
+      </div>
+
+      <!-- วันที่ใช้งานของเครื่องมือแต่ละเครื่อง -->
+      <div style="background:var(--s2);border-radius:7px;padding:10px 12px;border-left:3px solid var(--ok)">
+        <div style="font-size:11px;font-weight:700;color:var(--ok);margin-bottom:7px">🔢 วันที่ใช้งานของเครื่องมือแต่ละเครื่อง</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <select id="secEqdEq" onchange="renderSum({})" style="flex:1;min-width:120px;font-size:12px;padding:4px 7px;background:var(--bg);border:1px solid var(--bd);border-radius:4px;color:var(--tx)">
+            <option value="">— ทุกเครื่องมือ —</option>
+          </select>
+          <button class="btn bg sm" style="font-size:10px;padding:3px 7px" onclick="document.getElementById('secEqdEq').value='';renderSum({})">✕</button>
         </div>
       </div>
 
@@ -2691,6 +2725,7 @@ function initSumFilters(){
     'secBarEq':'eq','secDayEq':'eq',
     'secAvgEq':'eq',
     'secOvDept':'dept','secOvEq':'eq',
+    'secEqdEq':'eq',
     'secAllDept':'dept','secAllEq':'eq'
   };
   Object.keys(secSelects).forEach(function(id){
@@ -3490,6 +3525,7 @@ async function renderSum(r){
   var secAvgEq  =(document.getElementById('secAvgEq') ||{}).value||'';
   var secOvDept =(document.getElementById('secOvDept')||{}).value||'';
   var secOvEq   =(document.getElementById('secOvEq')  ||{}).value||'';
+  var secEqdEq  =(document.getElementById('secEqdEq') ||{}).value||'';
   var secAllDept=(document.getElementById('secAllDept')||{}).value||'';
   var secAllEq  =(document.getElementById('secAllEq') ||{}).value||'';
   var secAllStat=(document.getElementById('secAllStat')||{}).value||'';
@@ -4367,7 +4403,8 @@ async function renderSum(r){
   var _eqdUID='eqdtbl_'+Math.random().toString(36).substr(2,6);
   (function(){
     var eqDaysLocal={};
-    expFiltered.forEach(function(item){
+    var expEqd=secEqdEq?expFiltered.filter(function(i){return S(i.eq.name)===secEqdEq;}):expFiltered;
+    expEqd.forEach(function(item){
       if(item.status==='PENDING'||item.status==='CANCELLED')return;
       if(!item.borrow)return;
       var eqNo=S(item.borrow.EquipmentNo);
