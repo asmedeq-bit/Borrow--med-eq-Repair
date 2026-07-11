@@ -2596,7 +2596,7 @@ function _lsSet(key,val){try{localStorage.setItem('meq_'+key,JSON.stringify(val)
 // เหมือนเดิมโดยไม่กระทบการทำงาน (loadConfig/saveConfig จะ fail แบบเงียบๆ)
 // ════════════════════════════════════════════════════════════
 var _CFG_TABLE='app_settings';
-var _CFG_KEYS=['depts','eql','accs','staff','eqnums','retremarks','inventory','hfncset'];
+var _CFG_KEYS=['depts','eql','accs','staff','eqnums','retremarks','inventory','hfncset','dept_disabled','eql_disabled','retremarks_disabled'];
 
 async function loadConfig(){
   try{
@@ -2613,6 +2613,9 @@ async function loadConfig(){
         case 'eqnums':     EQNUMS=r.value; break;
         case 'retremarks': RETREMARKS=r.value; break;
         case 'inventory':  window._EQ_INV=r.value; break;
+        case 'dept_disabled': DEPT_DISABLED=r.value; break;
+        case 'eql_disabled':  EQL_DISABLED=r.value; break;
+        case 'retremarks_disabled': RETREMARKS_DISABLED=r.value; break;
         // 'hfncset': ไม่ต้องตั้งตัวแปรเพิ่ม — _hfncSetGet() อ่านจาก localStorage
         // (ที่ sync แล้วข้างบน) สดทุกครั้งที่ใช้งานอยู่แล้ว
       }
@@ -2643,9 +2646,15 @@ var ACCS=_lsGet('accs',_ACCS_DEFAULT);
 var STAFF=_lsGet('staff',_STAFF_DEFAULT);
 var EQNUMS=_lsGet('eqnums',_EQNUMS_DEFAULT);
 var RETREMARKS=_lsGet('retremarks',_RETREMARKS_DEFAULT);
+var DEPT_DISABLED=_lsGet('dept_disabled',[]);
+var EQL_DISABLED=_lsGet('eql_disabled',[]);
+var RETREMARKS_DISABLED=_lsGet('retremarks_disabled',[]);
+function activeDEPTS(){return DEPTS.filter(function(d){return DEPT_DISABLED.indexOf(d.n)===-1;});}
+function activeEQL(){return EQL.filter(function(e){return EQL_DISABLED.indexOf(e)===-1;});}
+function activeRETREMARKS(){return RETREMARKS.filter(function(r){return RETREMARKS_DISABLED.indexOf(r)===-1;});}
 
 // Working copies for list manager (edited before applying)
-var _wDepts=null,_wStaff=null,_wEql=null,_wAcc=null;
+var _wDepts=null,_wStaff=null,_wEql=null,_wAcc=null,_wDeptDisabled=null,_wEqlDisabled=null,_wRetremDisabled=null;
 var _selDeptIdx=-1,_selStaffIdx=-1,_selEqlIdx2=-1,_selAccIdx=-1;
 
 var loans=null,borrows=null,selAccs={},_rMap={},_selEqIdx=-1,_borrowEqName='';
@@ -2660,12 +2669,12 @@ document.addEventListener('DOMContentLoaded',async function(){
   // จะ fallback ไปใช้ localStorage/ค่า default ตามเดิมโดยไม่กระทบการใช้งาน
   await Promise.race([loadConfig(),new Promise(function(res){setTimeout(res,3000);})]);
   setToday();buildEqCards();buildAccTable();rebuildEqNoDatalist();rebuildRetRemarkSelect();
-  buildSSL('deptList',DEPTS,function(c,n){pickDept('deptList',c,n);});
-  buildSSL('trDeptList',DEPTS,function(c,n){pickDept('trDeptList',c,n);});
+  buildSSL('deptList',activeDEPTS(),function(c,n){pickDept('deptList',c,n);});
+  buildSSL('trDeptList',activeDEPTS(),function(c,n){pickDept('trDeptList',c,n);});
   buildStaff();initFilters();loadAll();
   // fill addLoan equipment select
   var sel=document.getElementById('addLoanEq');
-  EQL.forEach(function(e){sel.innerHTML+='<option value="'+e+'">'+e+'</option>';});
+  activeEQL().forEach(function(e){sel.innerHTML+='<option value="'+e+'">'+e+'</option>';});
   // fill admBorEq
   var sel2=document.getElementById('admBorEq');
   EQL.forEach(function(e){sel2.innerHTML+='<option value="'+e+'">'+e+'</option>';});
@@ -2819,7 +2828,7 @@ document.addEventListener('DOMContentLoaded',function(){
   }
 });
 
-function buildEqCards(){var grid=document.getElementById('eqCardGrid');if(!grid)return;EQL.forEach(function(name,i){var card=document.createElement('div');card.id='eqcard_'+i;card.style.cssText='border:2px solid var(--bd);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .18s;background:var(--bg);position:relative;min-height:54px;display:flex;flex-direction:column;justify-content:center;gap:6px';card.innerHTML='<div style="font-size:13px;font-weight:600;color:var(--tx);line-height:1.4;padding-right:22px">'+name+'</div>'+(name==='อื่นๆ'?'<input type="text" id="oth_'+i+'" placeholder="ระบุรายละเอียด..." onclick="event.stopPropagation()" style="font-size:12px;padding:5px 8px;width:100%;border:1px solid var(--bd);border-radius:4px;background:var(--s1);color:var(--tx)">':'')
+function buildEqCards(){var grid=document.getElementById('eqCardGrid');if(!grid)return;EQL.forEach(function(name,i){if(EQL_DISABLED.indexOf(name)!==-1)return;var card=document.createElement('div');card.id='eqcard_'+i;card.style.cssText='border:2px solid var(--bd);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .18s;background:var(--bg);position:relative;min-height:54px;display:flex;flex-direction:column;justify-content:center;gap:6px';card.innerHTML='<div style="font-size:13px;font-weight:600;color:var(--tx);line-height:1.4;padding-right:22px">'+name+'</div>'+(name==='อื่นๆ'?'<input type="text" id="oth_'+i+'" placeholder="ระบุรายละเอียด..." onclick="event.stopPropagation()" style="font-size:12px;padding:5px 8px;width:100%;border:1px solid var(--bd);border-radius:4px;background:var(--s1);color:var(--tx)">':'')
       +(['Ventilator','HFNC'].indexOf(name)>=0?
         '<div id="vhpanel_'+i+'" onclick="event.stopPropagation()" style="display:none;margin-top:10px;background:rgba(0,200,255,.05);border:1px solid rgba(0,200,255,.25);border-radius:7px;padding:12px">'
           +'<div style="font-size:10px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px">🔩 รายละเอียดเพิ่มเติมลงเฉพาะเครื่อง standby</div>'
@@ -6459,6 +6468,7 @@ function showListTab(name,el){
     _wRetrem=RETREMARKS.map(function(r){
       return{label:r,needDetail:['ย้ายไปหน่วยวิกฤต','เครื่องมืออุปกรณ์ชำรุดขัดข้อง','อื่นๆ'].includes(r)};
     });
+    _wRetremDisabled=RETREMARKS_DISABLED.slice();
     _selRetremIdx=-1;renderRetremList();
   }
   else if(name==='hfncset'){renderHfncSetAdmin();}
@@ -6467,13 +6477,16 @@ function showListTab(name,el){
 // ── called when entering lists-mgr tab ──
 function initListsTab(){
   _wDepts=DEPTS.map(function(d){return{c:d.c,n:d.n};});
+  _wDeptDisabled=DEPT_DISABLED.slice();
   _wStaff=STAFF.slice();
   _wEql=EQL.slice();
+  _wEqlDisabled=EQL_DISABLED.slice();
   _wAcc=ACCS.map(function(a){return{id:a.id,n:a.n,no:!!a.no,det:!!a.det};});
   _wEqnum=EQNUMS.slice();
   _wRetrem=RETREMARKS.map(function(r){
     return{label:r,needDetail:['ย้ายไปหน่วยวิกฤต','เครื่องมืออุปกรณ์ชำรุดขัดข้อง','อื่นๆ'].includes(r)};
   });
+  _wRetremDisabled=RETREMARKS_DISABLED.slice();
   showListTab('dept',document.getElementById('ltab-dept'));
 }
 
@@ -6486,11 +6499,13 @@ function renderDeptList(){
   var html=_wDepts.map(function(d,i){
     if(q&&!d.n.toLowerCase().includes(q)&&!d.c.includes(q))return'';
     var sel=_selDeptIdx===i;
-    return'<div onclick="selectDeptItem('+i+')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd);cursor:pointer;background:'+(sel?'rgba(245,158,11,.12)':'transparent')+';transition:background .1s" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\''+(sel?'rgba(245,158,11,.12)':'transparent')+'\'"> '
+    var isOff=_wDeptDisabled.indexOf(d.n)!==-1;
+    return'<div onclick="selectDeptItem('+i+')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd);cursor:pointer;opacity:'+(isOff?'.5':'1')+';background:'+(sel?'rgba(245,158,11,.12)':'transparent')+';transition:background .1s" onmouseover="this.style.background=\'rgba(255,255,255,.04)\'" onmouseout="this.style.background=\''+(sel?'rgba(245,158,11,.12)':'transparent')+'\'"> '
       +'<span style="font-family:var(--mo);font-size:10px;color:var(--mu);width:36px;flex-shrink:0">'+d.c+'</span>'
-      +'<span style="flex:1;font-size:13px"'+(sel?' style="font-weight:700;color:#f59e0b"':'')+'>'+d.n+'</span>'
+      +'<span style="flex:1;font-size:13px;text-decoration:'+(isOff?'line-through':'none')+'"'+(sel?' style="font-weight:700;color:#f59e0b"':'')+'>'+d.n+(isOff?' <span style="font-size:9px;padding:1px 6px;background:rgba(139,148,158,.15);color:var(--mu);border-radius:8px">ปิดใช้งาน</span>':'')+'</span>'
       +'<div style="display:flex;gap:4px">'
         +'<button class="abt" style="font-size:10px;border-color:#f59e0b;color:#f59e0b" onclick="event.stopPropagation();startEditDept('+i+')">✏️</button>'
+        +'<button class="abt" style="font-size:10px;border-color:'+(isOff?'var(--ok)':'var(--mu)')+';color:'+(isOff?'var(--ok)':'var(--mu)')+'" onclick="event.stopPropagation();toggleDeptDisabled('+i+')">'+(isOff?'▶':'⏸')+'</button>'
         +'<button class="abt" style="font-size:10px;border-color:var(--er);color:var(--er)" onclick="event.stopPropagation();removeDeptAt('+i+')">✕</button>'
       +'</div></div>';
   }).join('');
@@ -6517,6 +6532,12 @@ function cancelEditDept(){document.getElementById('editDeptPanel').style.display
 function removeDeptAt(i){
   if(_wDepts[i].n==='อื่นๆ'){toast('ไม่สามารถลบ "อื่นๆ" ได้','warning');return;}
   _wDepts.splice(i,1);if(_selDeptIdx>=_wDepts.length)_selDeptIdx=_wDepts.length-1;
+  renderDeptList();
+}
+function toggleDeptDisabled(i){
+  var n=_wDepts[i].n;if(n==='อื่นๆ'){toast('ไม่สามารถปิดใช้งาน "อื่นๆ" ได้','warning');return;}
+  var idx=_wDeptDisabled.indexOf(n);
+  if(idx===-1)_wDeptDisabled.push(n);else _wDeptDisabled.splice(idx,1);
   renderDeptList();
 }
 function deleteSelectedDept(){if(_selDeptIdx<0){toast('กรุณาเลือกแผนกก่อน','warning');return;}removeDeptAt(_selDeptIdx);}
@@ -6553,6 +6574,7 @@ function bulkAddDepts(){
 function applyDeptChanges(){
   if(!confirm('บันทึกรายชื่อแผนกใหม่ '+_wDepts.length+' รายการ?\nจะมีผลทันทีกับ Dropdown ทั้งหมด'))return;
   DEPTS=_wDepts.slice();saveConfig('depts',DEPTS);
+  DEPT_DISABLED=_wDeptDisabled.slice();saveConfig('dept_disabled',DEPT_DISABLED);
   rebuildAllSelects();toast('บันทึกแผนกสำเร็จ! '+DEPTS.length+' รายการ','success');
 }
 
@@ -6634,9 +6656,10 @@ function renderEqList(){
   var html=_wEql.map(function(e,i){
     if(q&&!e.toLowerCase().includes(q))return'';
     var sel=_selEqlIdx2===i;
-    return'<div onclick="selectEqItem('+i+')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd);cursor:pointer;background:'+(sel?'rgba(245,158,11,.12)':'transparent')+'">'
-      +'<span style="flex:1;font-size:13px">🔧 '+e+'</span>'
-      +'<div style="display:flex;gap:4px"><button class="abt" style="font-size:10px;border-color:#f59e0b;color:#f59e0b" onclick="event.stopPropagation();startEditEq('+i+')">✏️</button><button class="abt" style="font-size:10px;border-color:var(--er);color:var(--er)" onclick="event.stopPropagation();removeEqAt('+i+')">✕</button></div>'
+    var isOff=_wEqlDisabled.indexOf(e)!==-1;
+    return'<div onclick="selectEqItem('+i+')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd);cursor:pointer;opacity:'+(isOff?'.5':'1')+';background:'+(sel?'rgba(245,158,11,.12)':'transparent')+'">'
+      +'<span style="flex:1;font-size:13px;text-decoration:'+(isOff?'line-through':'none')+'">🔧 '+e+(isOff?' <span style="font-size:9px;padding:1px 6px;background:rgba(139,148,158,.15);color:var(--mu);border-radius:8px">ปิดใช้งาน</span>':'')+'</span>'
+      +'<div style="display:flex;gap:4px"><button class="abt" style="font-size:10px;border-color:#f59e0b;color:#f59e0b" onclick="event.stopPropagation();startEditEq('+i+')">✏️</button><button class="abt" style="font-size:10px;border-color:'+(isOff?'var(--ok)':'var(--mu)')+';color:'+(isOff?'var(--ok)':'var(--mu)')+'" onclick="event.stopPropagation();toggleEqDisabled('+i+')">'+(isOff?'▶':'⏸')+'</button><button class="abt" style="font-size:10px;border-color:var(--er);color:var(--er)" onclick="event.stopPropagation();removeEqAt('+i+')">✕</button></div>'
       +'</div>';
   }).join('');
   area.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--mu);font-size:12px">ไม่มีรายการ</div>';
@@ -6660,6 +6683,12 @@ function removeEqAt(i){
   if(_wEql[i]==='อื่นๆ'){toast('ไม่สามารถลบ "อื่นๆ" ได้','warning');return;}
   _wEql.splice(i,1);if(_selEqlIdx2>=_wEql.length)_selEqlIdx2=-1;renderEqList();
 }
+function toggleEqDisabled(i){
+  var n=_wEql[i];if(n==='อื่นๆ'){toast('ไม่สามารถปิดใช้งาน "อื่นๆ" ได้','warning');return;}
+  var idx=_wEqlDisabled.indexOf(n);
+  if(idx===-1)_wEqlDisabled.push(n);else _wEqlDisabled.splice(idx,1);
+  renderEqList();
+}
 function deleteSelectedEq(){if(_selEqlIdx2<0){toast('กรุณาเลือกรายการก่อน','warning');return;}removeEqAt(_selEqlIdx2);}
 function moveEqItem(dir){
   if(_selEqlIdx2<0)return;var i=_selEqlIdx2,j=i+dir;
@@ -6677,6 +6706,7 @@ function addEqItem(){
 function applyEqChanges(){
   if(!confirm('บันทึกรายการเครื่องมือ '+_wEql.length+' รายการ?\nจะมีผลทันทีกับการ์ดเลือกเครื่องมือและ Dropdown ทั้งหมด'))return;
   EQL=_wEql.slice();saveConfig('eql',EQL);
+  EQL_DISABLED=_wEqlDisabled.slice();saveConfig('eql_disabled',EQL_DISABLED);
   rebuildEqCards();rebuildEqSelects();
   toast('บันทึกรายการเครื่องมือสำเร็จ! '+EQL.length+' รายการ','success');
 }
@@ -6801,10 +6831,11 @@ function renderRetremList(){
   area.innerHTML=_wRetrem.map(function(r,i){
     var sel=_selRetremIdx===i;
     var isOther=r.label==='อื่นๆ';
-    return'<div onclick="selectRetremItem('+i+')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd);cursor:pointer;background:'+(sel?'rgba(16,185,129,.1)':'transparent')+'">'
-      +'<span style="flex:1;font-size:13px">'+r.label+'</span>'
+    var isOff=_wRetremDisabled.indexOf(r.label)!==-1;
+    return'<div onclick="selectRetremItem('+i+')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--bd);cursor:pointer;opacity:'+(isOff?'.5':'1')+';background:'+(sel?'rgba(16,185,129,.1)':'transparent')+'">'
+      +'<span style="flex:1;font-size:13px;text-decoration:'+(isOff?'line-through':'none')+'">'+r.label+(isOff?' <span style="font-size:9px;padding:1px 6px;background:rgba(139,148,158,.15);color:var(--mu);border-radius:8px">ปิดใช้งาน</span>':'')+'</span>'
       +(r.needDetail?'<span style="font-size:10px;background:rgba(245,158,11,.15);color:var(--wn);border-radius:4px;padding:1px 5px">+รายละเอียด</span>':'')
-      +(isOther?'<span style="font-size:10px;color:var(--mu)">ล็อค</span>':'<button class="abt" style="font-size:10px;border-color:var(--er);color:var(--er)" onclick="event.stopPropagation();removeRetremAt('+i+')">✕</button>')
+      +(isOther?'<span style="font-size:10px;color:var(--mu)">ล็อค</span>':'<button class="abt" style="font-size:10px;border-color:'+(isOff?'var(--ok)':'var(--mu)')+';color:'+(isOff?'var(--ok)':'var(--mu)')+'" onclick="event.stopPropagation();toggleRetremDisabled('+i+')">'+(isOff?'▶':'⏸')+'</button> <button class="abt" style="font-size:10px;border-color:var(--er);color:var(--er)" onclick="event.stopPropagation();removeRetremAt('+i+')">✕</button>')
       +'</div>';
   }).join('')||'<div style="text-align:center;padding:20px;color:var(--mu);font-size:12px">ไม่มีรายการ</div>';
 }
@@ -6812,6 +6843,12 @@ function selectRetremItem(i){_selRetremIdx=i;renderRetremList();}
 function removeRetremAt(i){
   if(_wRetrem[i]&&_wRetrem[i].label==='อื่นๆ'){toast('ไม่สามารถลบ "อื่นๆ" ได้','warning');return;}
   _wRetrem.splice(i,1);if(_selRetremIdx>=_wRetrem.length)_selRetremIdx=-1;renderRetremList();
+}
+function toggleRetremDisabled(i){
+  var label=_wRetrem[i]&&_wRetrem[i].label;if(!label||label==='อื่นๆ'){toast('ไม่สามารถปิดใช้งาน "อื่นๆ" ได้','warning');return;}
+  var idx=_wRetremDisabled.indexOf(label);
+  if(idx===-1)_wRetremDisabled.push(label);else _wRetremDisabled.splice(idx,1);
+  renderRetremList();
 }
 function deleteSelectedRetrem(){if(_selRetremIdx<0){toast('กรุณาเลือกรายการก่อน','warning');return;}removeRetremAt(_selRetremIdx);}
 function moveRetremItem(dir){if(_selRetremIdx<0)return;var i=_selRetremIdx,j=i+dir;if(j<0||j>=_wRetrem.length)return;var t=_wRetrem[i];_wRetrem[i]=_wRetrem[j];_wRetrem[j]=t;_selRetremIdx=j;renderRetremList();}
@@ -6830,6 +6867,7 @@ function applyRetremChanges(){
   if(!confirm('บันทึกเหตุผลการรับคืน '+_wRetrem.length+' รายการ?'))return;
   RETREMARKS=_wRetrem.map(function(r){return r.label;});
   saveConfig('retremarks',RETREMARKS);
+  RETREMARKS_DISABLED=_wRetremDisabled.slice();saveConfig('retremarks_disabled',RETREMARKS_DISABLED);
   rebuildRetRemarkSelect();toast('บันทึกสำเร็จ! '+RETREMARKS.length+' รายการ','success');
 }
 
@@ -7046,8 +7084,9 @@ function rebuildRetRemarkSelect(){
   var sel=document.getElementById('retRemark');if(!sel)return;
   var cur=sel.value;
   sel.innerHTML='<option value="">เลือกเหตุผล</option>';
-  RETREMARKS.forEach(function(r){sel.innerHTML+='<option value="'+r+'">'+r+'</option>';});
-  if(RETREMARKS.includes(cur))sel.value=cur;
+  var list=activeRETREMARKS();
+  list.forEach(function(r){sel.innerHTML+='<option value="'+r+'">'+r+'</option>';});
+  if(list.indexOf(cur)!==-1)sel.value=cur;
 }
 
 function rebuildAllSelects(){
@@ -7068,8 +7107,8 @@ function rebuildAllSelects(){
     el.value=v;
   })();
   // rebuild SSL lists
-  buildSSL('deptList',DEPTS,function(c,n){pickDept('deptList',c,n);});
-  buildSSL('trDeptList',DEPTS,function(c,n){pickDept('trDeptList',c,n);});
+  buildSSL('deptList',activeDEPTS(),function(c,n){pickDept('deptList',c,n);});
+  buildSSL('trDeptList',activeDEPTS(),function(c,n){pickDept('trDeptList',c,n);});
 }
 function rebuildStaffSelects(){
   ['giverSel','receiverSel','transfererSel'].forEach(function(id){
@@ -7088,8 +7127,9 @@ function rebuildEqSelects(){
     var el=document.getElementById(id);if(!el)return;
     var v=el.value;var firstOpt=el.options[0]?el.options[0].outerHTML:'';
     el.innerHTML=firstOpt;
-    EQL.forEach(function(e){el.innerHTML+='<option value="'+e+'">'+e+'</option>';});
-    el.value=EQL.includes(v)?v:'';
+    var list=(id==='addLoanEq')?activeEQL():EQL;
+    list.forEach(function(e){el.innerHTML+='<option value="'+e+'">'+e+'</option>';});
+    el.value=list.indexOf(v)!==-1?v:'';
   });
 }
 
