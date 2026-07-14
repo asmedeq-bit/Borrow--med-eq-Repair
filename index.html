@@ -827,6 +827,8 @@ function toggleTheme(){
       <div class="fg"><label>เหตุผลคืน</label><select id="allRetRemark" onchange="_allFilterChange()"><option value="">ทุกเหตุผล</option></select></div>
       <div class="fg"><label>จาก</label><input type="date" id="allDateS" onchange="_allFilterChange()"></div>
       <div class="fg"><label>ถึง</label><input type="date" id="allDateE" onchange="_allFilterChange()"></div>
+      <div class="fg"><label>เวลา จาก</label><input type="time" id="allTimeS" onchange="_allFilterChange()"></div>
+      <div class="fg"><label>เวลา ถึง</label><input type="time" id="allTimeE" onchange="_allFilterChange()"></div>
       <div class="fg"><label style="font-size:9px">ดาวน์โหลด (ครบตาม filter)</label>
         <div style="display:flex;gap:4px">
           <button class="btn bg sm" onclick="dlPage('all','csv')">CSV</button>
@@ -2480,7 +2482,7 @@ var API = {
       ?'order=created_at.desc&limit=50000'
       :'or=(status.eq.ACTIVE,status.eq.PENDING,status.eq.ACC_PENDING,and(status.eq.RETURNED,loan_date.gte.'+cutoffStr+'),and(status.eq.CANCELLED,loan_date.gte.'+cutoffStr+'))&order=created_at.desc&limit=10000';
     var rows=await SB.get('loan_requests',query);
-    return rows.map(function(r){return{LoanID:r.loan_id,LoanDate:r.loan_date,BorrowerName:r.borrower_name,DeptCode:r.dept_code,DeptName:r.dept_name,PatientName:r.patient_name,EquipmentList:Array.isArray(r.equipment_list)?r.equipment_list:[],Status:r.status};});
+    return rows.map(function(r){return{LoanID:r.loan_id,LoanDate:r.loan_date,BorrowerName:r.borrower_name,DeptCode:r.dept_code,DeptName:r.dept_name,PatientName:r.patient_name,EquipmentList:Array.isArray(r.equipment_list)?r.equipment_list:[],Status:r.status,CreatedAt:r.created_at||''};});
   },
   getAllBorrows: async function(fullHistory){
     var cutoff=new Date();cutoff.setFullYear(cutoff.getFullYear()-1);var cutoffStr=cutoff.toISOString().split('T')[0];
@@ -2495,7 +2497,7 @@ var API = {
       ACC_MAP.forEach(function(a){var val=r[a.col]||'';if(val&&val.trim())accs.push({id:a.id,name:a.name,no:val==='✓'?'':val});});
       var retAccs=r.returned_accs;if(!Array.isArray(retAccs))retAccs=[];
       var th=r.transfer_history;if(!Array.isArray(th))th=[];
-      return{RecordID:r.record_id,LoanID:r.loan_id,GiverName:r.giver_name||'',EquipmentNo:r.equipment_no||'',EquipItemIndex:r.equip_item_index||0,Accessories:accs,ReturnRemark:r.return_remark||'',ReturnDetail:r.return_detail||'',ReturnDate:r.return_date||'',MachineReturnDate:r.machine_return_date||'',MachineReturned:r.machine_returned||false,ReturnedAccs:retAccs,TransferHistory:th,Status:r.status,ReceiverName:r.receiver_name||''};
+      return{RecordID:r.record_id,LoanID:r.loan_id,GiverName:r.giver_name||'',EquipmentNo:r.equipment_no||'',EquipItemIndex:r.equip_item_index||0,Accessories:accs,ReturnRemark:r.return_remark||'',ReturnDetail:r.return_detail||'',ReturnDate:r.return_date||'',MachineReturnDate:r.machine_return_date||'',MachineReturned:r.machine_returned||false,ReturnedAccs:retAccs,TransferHistory:th,Status:r.status,ReceiverName:r.receiver_name||'',ReturnedAt:r.returned_at||''};
     });
   },
   submitLoan: async function(data){
@@ -2561,7 +2563,9 @@ var API = {
     // ถ้าคืนอุปกรณ์อย่างเดียว (เครื่องคืนไปแล้ว) → ไม่เขียนทับ return_remark เดิม
     var patchBody={return_detail:returnData.returnDetail||'',return_date:returnData.returnDate||null,machine_returned:machineReturned,returned_accs:prev,status:newStatus,receiver_name:returnData.receiverName||''};
     if(!returnData.machineAlreadyReturned)patchBody.return_remark=returnData.returnRemark||'';
-    if(machineReturned&&!rec.machine_return_date)patchBody.machine_return_date=returnData.returnDate||null;await SB.patch('borrow_records','record_id=eq.'+encodeURIComponent(recordID),patchBody);
+    if(machineReturned&&!rec.machine_return_date)patchBody.machine_return_date=returnData.returnDate||null;
+    if(machineReturned&&!rec.returned_at)patchBody.returned_at=new Date().toISOString();
+    await SB.patch('borrow_records','record_id=eq.'+encodeURIComponent(recordID),patchBody);
   },
   transferEquipment: async function(recordID,transferData){
     var recs=await SB.get('borrow_records','record_id=eq.'+encodeURIComponent(recordID));
@@ -3294,6 +3298,8 @@ function _getAllItems(){
   var stat=document.getElementById('allStat').value;
   var retRemarkEl=document.getElementById('allRetRemark');var retRemark=retRemarkEl?retRemarkEl.value:'';
   var ds=document.getElementById('allDateS').value,de=document.getElementById('allDateE').value;
+  var tsEl=document.getElementById('allTimeS'),teEl=document.getElementById('allTimeE');
+  var ts=tsEl?tsEl.value:'',te=teEl?teEl.value:'';
   var now=new Date();
   return sortItems(expanded().filter(function(item){
     if(stat&&item.status!==stat)return false;
@@ -3303,6 +3309,14 @@ function _getAllItems(){
     var ld=item.loan.LoanDate;
     if(ds&&ld&&ld<ds)return false;
     if(de&&ld&&ld>de)return false;
+    if(ts||te){
+      var timeSrc=(item.status==='RETURNED'&&item.borrow&&item.borrow.ReturnedAt)?item.borrow.ReturnedAt:item.loan.CreatedAt;
+      if(!timeSrc)return false;
+      var hm=localTimeHM(timeSrc);
+      if(!hm)return false;
+      if(ts&&hm<ts)return false;
+      if(te&&hm>te)return false;
+    }
     var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');
     return!search||txt.toLowerCase().includes(search);
   }));
@@ -3510,6 +3524,12 @@ async function loadSum(){
 
 // ── Timezone Bangkok (UTC+7) helpers ──────────────────────────
 var _bkkFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok'});
+var _bkkHMFmt=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+function localTimeHM(d){
+  // คืนค่า "HH:MM" ตามเวลาไทย เทียบกับค่า <input type="time"> ได้ตรงๆ
+  if(!d)return'';
+  try{return _bkkHMFmt.format(d instanceof Date?d:new Date(d));}catch(e){return'';}
+}
 function localDateStr(d){
   // ล็อค Asia/Bangkok เสมอ ไม่ขึ้นกับ timezone ของเครื่องผู้ใช้
   return _bkkFmt.format(d instanceof Date?d:new Date(d));
