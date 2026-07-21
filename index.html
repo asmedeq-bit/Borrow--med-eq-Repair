@@ -1334,6 +1334,7 @@ function toggleTheme(){
         <button class="atab" id="ltab-eqnum" onclick="showListTab('eqnum',this)" style="font-size:11px">🔢 หมายเลขเครื่องมือ</button>
         <button class="atab" id="ltab-retrem" onclick="showListTab('retrem',this)" style="font-size:11px">↩ เหตุผลการรับคืน</button>
         <button class="atab" id="ltab-hfncset" onclick="showListTab('hfncset',this)" style="font-size:11px">💨 HFNC Set</button>
+        <button class="atab" id="ltab-circuitalert" onclick="showListTab('circuitalert',this)" style="font-size:11px">🔔 แจ้งเตือน Circuit</button>
       </div>
 
       <!-- DEPT LIST -->
@@ -1641,6 +1642,39 @@ function toggleTheme(){
           <div id="hfncSetAdminArea"></div>
           <div style="margin-top:14px;display:flex;gap:6px;justify-content:flex-end">
             <button class="btn badm sm" onclick="applyHfncSetChanges()">✅ บันทึกการเปลี่ยนแปลง</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CIRCUIT ALERT -->
+      <div id="lsec-circuitalert" style="display:none">
+        <div class="card" style="max-width:520px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+            <div class="ctitle" style="margin:0;color:#f59e0b">🔔 แจ้งเตือน Ventilator/HFNC ต้องเปลี่ยน Circuit (เกิน 30 วัน)</div>
+          </div>
+          <div style="font-size:12px;color:var(--mu);margin-bottom:14px">ใช้งานได้เฉพาะตอนเปิดหน้าจอ/แท็บนี้ค้างไว้เท่านั้น (เสียงเล่นผ่านเบราว์เซอร์ ไม่ใช่ push notification)</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border:1px solid var(--bd);border-radius:8px">
+              <input type="radio" name="circuitAlertMode" value="beep" id="circuitAlertModeBeep"> <span>1. เสียงเตือน (บี๊บ)</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border:1px solid var(--bd);border-radius:8px">
+              <input type="radio" name="circuitAlertMode" value="beep_speech" id="circuitAlertModeSpeech"> <span>2. เสียงเตือน + เสียงพูด</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border:1px solid var(--bd);border-radius:8px">
+              <input type="radio" name="circuitAlertMode" value="off" id="circuitAlertModeOff"> <span>3. ปิดเสียง</span>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <label style="font-size:13px;color:var(--mu)">แจ้งเตือนซ้ำทุก</label>
+            <select id="circuitAlertHrs" style="padding:4px 8px;background:var(--bg);border:1px solid var(--bd);border-radius:4px;color:var(--tx)">
+              <option value="1">1 ชม.</option><option value="2">2 ชม.</option><option value="3">3 ชม.</option>
+              <option value="4">4 ชม.</option><option value="6">6 ชม.</option><option value="8">8 ชม.</option>
+              <option value="12">12 ชม.</option><option value="24">24 ชม.</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn bg sm" onclick="testCircuitAlertSound()">🔊 ทดสอบเสียง</button>
+            <button class="btn badm sm" onclick="applyCircuitAlertChanges()">✅ บันทึกการเปลี่ยนแปลง</button>
           </div>
         </div>
       </div>
@@ -2600,7 +2634,7 @@ function _lsSet(key,val){try{localStorage.setItem('meq_'+key,JSON.stringify(val)
 // เหมือนเดิมโดยไม่กระทบการทำงาน (loadConfig/saveConfig จะ fail แบบเงียบๆ)
 // ════════════════════════════════════════════════════════════
 var _CFG_TABLE='app_settings';
-var _CFG_KEYS=['depts','eql','accs','staff','eqnums','retremarks','inventory','hfncset','dept_disabled','eql_disabled','retremarks_disabled'];
+var _CFG_KEYS=['depts','eql','accs','staff','eqnums','retremarks','inventory','hfncset','dept_disabled','eql_disabled','retremarks_disabled','circuit_alert'];
 
 async function loadConfig(){
   try{
@@ -2620,6 +2654,7 @@ async function loadConfig(){
         case 'dept_disabled': DEPT_DISABLED=r.value; break;
         case 'eql_disabled':  EQL_DISABLED=r.value; break;
         case 'retremarks_disabled': RETREMARKS_DISABLED=r.value; break;
+        case 'circuit_alert': CIRCUIT_ALERT=r.value; if(typeof scheduleCircuitAlert==='function')scheduleCircuitAlert(); break;
         // 'hfncset': ไม่ต้องตั้งตัวแปรเพิ่ม — _hfncSetGet() อ่านจาก localStorage
         // (ที่ sync แล้วข้างบน) สดทุกครั้งที่ใช้งานอยู่แล้ว
       }
@@ -2653,6 +2688,7 @@ var RETREMARKS=_lsGet('retremarks',_RETREMARKS_DEFAULT);
 var DEPT_DISABLED=_lsGet('dept_disabled',[]);
 var EQL_DISABLED=_lsGet('eql_disabled',[]);
 var RETREMARKS_DISABLED=_lsGet('retremarks_disabled',[]);
+var CIRCUIT_ALERT=_lsGet('circuit_alert',{mode:'beep',intervalHrs:6});
 function activeDEPTS(){return DEPTS.filter(function(d){return DEPT_DISABLED.indexOf(d.n)===-1;});}
 function activeEQL(){return EQL.filter(function(e){return EQL_DISABLED.indexOf(e)===-1;});}
 function activeRETREMARKS(){return RETREMARKS.filter(function(r){return RETREMARKS_DISABLED.indexOf(r)===-1;});}
@@ -2675,7 +2711,7 @@ document.addEventListener('DOMContentLoaded',async function(){
   setToday();buildEqCards();buildAccTable();rebuildEqNoDatalist();rebuildRetRemarkSelect();
   buildSSL('deptList',activeDEPTS(),function(c,n){pickDept('deptList',c,n);});
   buildSSL('trDeptList',activeDEPTS(),function(c,n){pickDept('trDeptList',c,n);});
-  buildStaff();initFilters();loadAll();
+  buildStaff();initFilters();loadAll().then(function(){scheduleCircuitAlert();});
   // fill addLoan equipment select
   var sel=document.getElementById('addLoanEq');
   activeEQL().forEach(function(e){sel.innerHTML+='<option value="'+e+'">'+e+'</option>';});
@@ -6473,7 +6509,7 @@ async function recalcAllStatuses(){
 // ════════════════════════════════════════════════════════════
 
 function showListTab(name,el){
-  ['dept','staff','eq','acc','eqnum','retrem','hfncset'].forEach(function(t){
+  ['dept','staff','eq','acc','eqnum','retrem','hfncset','circuitalert'].forEach(function(t){
     var s=document.getElementById('lsec-'+t);if(s)s.style.display='none';
     var b=document.getElementById('ltab-'+t);if(b)b.classList.remove('on');
   });
@@ -6492,6 +6528,13 @@ function showListTab(name,el){
     _selRetremIdx=-1;renderRetremList();
   }
   else if(name==='hfncset'){renderHfncSetAdmin();}
+  else if(name==='circuitalert'){
+    var m=(CIRCUIT_ALERT&&CIRCUIT_ALERT.mode)||'beep';
+    var rEl=document.getElementById('circuitAlertMode'+(m==='beep_speech'?'Speech':m==='off'?'Off':'Beep'));
+    if(rEl)rEl.checked=true;
+    var hrsEl=document.getElementById('circuitAlertHrs');
+    if(hrsEl)hrsEl.value=String((CIRCUIT_ALERT&&CIRCUIT_ALERT.intervalHrs)||6);
+  }
 }
 
 // ── called when entering lists-mgr tab ──
@@ -7002,6 +7045,77 @@ function applyHfncSetChanges(){
   renderHfncSetAdmin();
   // re-render section สถิติถ้าเปิดอยู่
   if(window._renderHfncSection)window._renderHfncSection();
+}
+
+// ── Circuit Alert (Ventilator/HFNC เกิน 30 วัน) ──────────────
+function _countCircuitOverdue(){
+  if(typeof expanded!=='function')return 0;
+  var CIRCUIT_EQ=['Ventilator','Ventilator transfer','HFNC','HFNC transfer'];
+  var now=new Date(),count=0;
+  expanded().forEach(function(item){
+    if(item.status!=='ACTIVE')return;
+    var eqName=S(item.eq.name);
+    if(!CIRCUIT_EQ.some(function(n){return eqName===n;}))return;
+    var ld=item.loan.LoanDate;if(!ld)return;
+    var d=Math.round((now-new Date(ld))/86400000);
+    if(d>30)count++;
+  });
+  return count;
+}
+function circuitBeep(){
+  try{
+    var ctx=new (window.AudioContext||window.webkitAudioContext)();
+    var o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';o.frequency.value=880;
+    g.gain.setValueAtTime(0.001,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.3,ctx.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.5);
+    o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.5);
+  }catch(e){}
+}
+function checkCircuitAlert(){
+  if(!CIRCUIT_ALERT||CIRCUIT_ALERT.mode==='off')return;
+  if(_countCircuitOverdue()<=0)return;
+  circuitBeep();
+  if(CIRCUIT_ALERT.mode==='beep_speech'){
+    setTimeout(function(){
+      try{
+        var u=new SpeechSynthesisUtterance('มีเครื่องครบเปลี่ยน Circuit รายละเอียดกรุณาเปิดดูในหน้าสถิติ');
+        u.lang='th-TH';u.rate=0.95;speechSynthesis.speak(u);
+      }catch(e){}
+    },600);
+  }
+}
+var _circuitAlertTimer=null;
+function scheduleCircuitAlert(){
+  if(_circuitAlertTimer){clearInterval(_circuitAlertTimer);_circuitAlertTimer=null;}
+  if(!CIRCUIT_ALERT||CIRCUIT_ALERT.mode==='off')return;
+  var ms=(CIRCUIT_ALERT.intervalHrs||6)*3600000;
+  _circuitAlertTimer=setInterval(checkCircuitAlert,ms);
+}
+function applyCircuitAlertChanges(){
+  var modeEl=document.querySelector('input[name="circuitAlertMode"]:checked');
+  var mode=modeEl?modeEl.value:'beep';
+  var hrsEl=document.getElementById('circuitAlertHrs');
+  var hrs=hrsEl?parseInt(hrsEl.value,10)||6:6;
+  CIRCUIT_ALERT={mode:mode,intervalHrs:hrs};
+  saveConfig('circuit_alert',CIRCUIT_ALERT);
+  scheduleCircuitAlert();
+  toast('บันทึกการตั้งค่าแจ้งเตือนสำเร็จ!','success');
+}
+function testCircuitAlertSound(){
+  var modeEl=document.querySelector('input[name="circuitAlertMode"]:checked');
+  var mode=modeEl?modeEl.value:'beep';
+  if(mode==='off'){toast('เลือก "ปิดเสียง" อยู่ ไม่มีเสียงให้ทดสอบ','warning');return;}
+  circuitBeep();
+  if(mode==='beep_speech'){
+    setTimeout(function(){
+      try{
+        var u=new SpeechSynthesisUtterance('มีเครื่องครบเปลี่ยน Circuit รายละเอียดกรุณาเปิดดูในหน้าสถิติ');
+        u.lang='th-TH';u.rate=0.95;speechSynthesis.speak(u);
+      }catch(e){}
+    },600);
+  }
 }
 
 function _patchHfncSetMatcher(sets){
