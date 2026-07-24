@@ -2943,6 +2943,18 @@ function computeStatus(borrow){if(!borrow)return'PENDING';var raw=S(borrow.Statu
 function expanded(){if(!loans||!borrows)return[];var _bwMap=new Map();borrows.forEach(function(b){_bwMap.set(S(b.LoanID)+'__'+N(b.EquipItemIndex),b);});var out=[];loans.forEach(function(loan){if(loan.Status==='CANCELLED'){(loan.EquipmentList||[]).forEach(function(eq,idx){out.push({loan:loan,eq:eq,idx:idx,borrow:null,status:'CANCELLED'});});return;}(loan.EquipmentList||[]).forEach(function(eq,idx){var bw=_bwMap.get(S(loan.LoanID)+'__'+idx)||null;out.push({loan:loan,eq:eq,idx:idx,borrow:bw,status:computeStatus(bw)});});});return out;}
 var STATUS_ORDER={PENDING:0,ACTIVE:1,ACC_PENDING:2,RETURNED:3,CANCELLED:4};
 function sortItems(items){return items.slice().sort(function(a,b){var pa=STATUS_ORDER[a.status]!==undefined?STATUS_ORDER[a.status]:5;var pb=STATUS_ORDER[b.status]!==undefined?STATUS_ORDER[b.status]:5;if(pa!==pb)return pa-pb;return(b.loan.LoanDate||'').localeCompare(a.loan.LoanDate||'');});}
+// ── ดันรายการที่ตรงคำค้นหาแบบเป๊ะขึ้นบนสุด (ไม่ซ่อนรายการอื่น แค่จัดลำดับใหม่) ──
+function _exactMatchFirst(list,search,getFieldsFn){
+  if(!search)return list;
+  var s=search.toLowerCase().trim();if(!s)return list;
+  var exact=[],rest=[];
+  list.forEach(function(x){
+    var fields=getFieldsFn(x)||[];
+    var isExact=fields.some(function(f){return S(f).toLowerCase()===s;});
+    (isExact?exact:rest).push(x);
+  });
+  return exact.concat(rest);
+}
 function badge(s){var m={PENDING:['bp2','รอดำเนินการจ่าย'],ACTIVE:['ba','ยืม'],RETURNED:['br2','คืน'],ACC_PENDING:['bap','คืน (อุปกรณ์ค้าง)'],CANCELLED:['bc2','ยกเลิก']};var p=m[s]||['bp2',s];return'<span class="badge '+p[0]+'">'+p[1]+'</span>';}
 function standbyBadge(eq){if(!eq)return'';var n=S(eq.name||'');if(!n.toLowerCase().includes('standby'))return'';return' <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;color:#f59e0b;vertical-align:middle">⏸ STANDBY</span>';}
 function buildTransferTrail(loan,borrow){if(!borrow)return'';var th=Array.isArray(borrow.TransferHistory)?borrow.TransferHistory:[];if(!th.length)return'';var crumbs=[];if(th[0]&&S(th[0].fromDept)){crumbs.push(ES(th[0].fromDept));}else{var _m=th[0]&&S(th[0].note).match(/โอนจาก\s*(.+)/);crumbs.push(_m&&_m[1].trim()?esc(_m[1].trim()):ES(loan.DeptName));}th.forEach(function(t){crumbs.push(ES(t.toDept));});var chips=crumbs.map(function(dept,i){var isLast=i===crumbs.length-1;if(isLast)return'<span class="tr-chip-cur">'+dept+' <span class="tr-now">ปัจจุบัน</span></span>';return'<span class="tr-chip">'+dept+'</span> <span class="tr-arr">›</span> ';}).join('');var last=th[th.length-1];var meta=last?'<div class="tr-meta">โอนล่าสุด '+S(last.date)+(last.transfererName?' · '+ES(last.transfererName):'')+' </div>':'';return'<div class="transfer-trail"><span class="tr-label">จากแผนก</span> '+chips+meta+'</div>';}
@@ -2991,6 +3003,11 @@ function _getRecGroups(){
   var groups=[],gmap={};
   items.forEach(function(item){var lid=S(item.loan.LoanID);if(!gmap[lid]){gmap[lid]=[];groups.push({lid:lid,loan:item.loan,items:gmap[lid]});}gmap[lid].push(item);});
   groups.sort(function(a,b){var pa=Math.min.apply(null,a.items.map(function(i){return STATUS_ORDER[i.status]!==undefined?STATUS_ORDER[i.status]:5;}));var pb=Math.min.apply(null,b.items.map(function(i){return STATUS_ORDER[i.status]!==undefined?STATUS_ORDER[i.status]:5;}));if(pa!==pb)return pa-pb;return(b.loan.LoanDate||'').localeCompare(a.loan.LoanDate||'');});
+  groups=_exactMatchFirst(groups,search,function(g){
+    var f=[S(g.loan.LoanID),S(g.loan.BorrowerName),S(g.loan.DeptName),S(g.loan.PatientName)];
+    g.items.forEach(function(i){f.push(S(i.eq.name));if(i.borrow)f.push(S(i.borrow.EquipmentNo));});
+    return f;
+  });
   return groups;
 }
 
@@ -3287,6 +3304,9 @@ function renderDaily(){
       var bn=parseInt((b.borrow?S(b.borrow.EquipmentNo):'').replace(/\D/g,''))||9999;
       return an-bn;
     });
+    allItems=_exactMatchFirst(allItems,search,function(i){
+      return[S(i.loan.PatientName),S(i.loan.BorrowerName),S(i.loan.DeptName),i.borrow?S(i.borrow.EquipmentNo):'',i.borrow?S(i.borrow.GiverName||''):''];
+    });
     var total=allItems.length;
     var totalPages=Math.max(1,Math.ceil(total/_dailyPageSize));
     if(!_dailyPages[eqName]||_dailyPages[eqName]>totalPages)_dailyPages[eqName]=1;
@@ -3337,7 +3357,7 @@ function _getAllItems(){
   var tsEl=document.getElementById('allTimeS'),teEl=document.getElementById('allTimeE');
   var ts=tsEl?tsEl.value:'',te=teEl?teEl.value:'';
   var now=new Date();
-  return sortItems(expanded().filter(function(item){
+  return _exactMatchFirst(sortItems(expanded().filter(function(item){
     if(stat&&item.status!==stat)return false;
     if(dept&&S(item.loan.DeptName)!==dept)return false;
     if(eq&&S(item.eq.name)!==eq)return false;
@@ -3355,7 +3375,9 @@ function _getAllItems(){
     }
     var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');
     return!search||txt.toLowerCase().includes(search);
-  }));
+  })),search,function(item){
+    return[S(item.loan.LoanID),S(item.loan.BorrowerName),S(item.loan.DeptName),S(item.loan.PatientName),S(item.eq.name),item.borrow?S(item.borrow.EquipmentNo):''];
+  });
 }
 function _allFilterChange(){_allPage=1;renderAll();}
 
@@ -6113,12 +6135,12 @@ function _getAdminLoansFiltered(){
   var stat=(document.getElementById('admLoanStat')||{}).value||'';
   var ds=(document.getElementById('admLoanDateS')||{}).value||'';
   var de=(document.getElementById('admLoanDateE')||{}).value||'';
-  return loans.filter(function(l){
+  return _exactMatchFirst(loans.filter(function(l){
     if(stat&&S(l.Status)!==stat)return false;
     var ld=l.LoanDate;if(ds&&ld&&ld<ds)return false;if(de&&ld&&ld>de)return false;
     var txt=S(l.LoanID)+' '+S(l.BorrowerName)+' '+S(l.DeptName)+' '+S(l.PatientName);
     return!search||txt.toLowerCase().includes(search);
-  });
+  }),search,function(l){return[S(l.LoanID),S(l.BorrowerName),S(l.DeptName),S(l.PatientName)];});
 }
 
 function _getAdminBorFiltered(){
@@ -6126,12 +6148,12 @@ function _getAdminBorFiltered(){
   var search=((document.getElementById('admBorSearch')||{}).value||'').toLowerCase();
   var stat=(document.getElementById('admBorStat')||{}).value||'';
   var eq=(document.getElementById('admBorEq')||{}).value||'';
-  return borrows.filter(function(b){
+  return _exactMatchFirst(borrows.filter(function(b){
     if(stat&&S(b.Status)!==stat)return false;
     if(eq){var loanObj=loans?loans.find(function(l){return S(l.LoanID)===S(b.LoanID);}):null;var eqName=loanObj&&loanObj.EquipmentList&&loanObj.EquipmentList[b.EquipItemIndex]?loanObj.EquipmentList[b.EquipItemIndex].name:'';if(S(eqName)!==eq)return false;}
     var txt=S(b.RecordID)+' '+S(b.LoanID)+' '+S(b.EquipmentNo)+' '+S(b.GiverName)+' '+S(b.ReceiverName);
     return!search||txt.toLowerCase().includes(search);
-  });
+  }),search,function(b){return[S(b.RecordID),S(b.LoanID),S(b.EquipmentNo),S(b.GiverName),S(b.ReceiverName)];});
 }
 
 function _admLoanFC(){_admLoanPage=1;renderAdminLoans();}
@@ -7290,7 +7312,7 @@ function getPageData(page){
   if(page==='rec'||page==='all'){
     var sf=page==='rec'?document.getElementById('recStat').value:document.getElementById('allStat').value;var feq=page==='rec'?document.getElementById('recEq').value:document.getElementById('allEq').value;var fdept=page==='rec'?document.getElementById('recDept').value:document.getElementById('allDept').value;var search=page==='rec'?document.getElementById('recSearch').value.toLowerCase():document.getElementById('allSearch').value.toLowerCase();var ds=page==='rec'?document.getElementById('recDateS').value:document.getElementById('allDateS').value;var de=page==='rec'?document.getElementById('recDateE').value:document.getElementById('allDateE').value;
     // all tab: ใช้ _getAllItems() เพื่อ export ครบตาม filter ไม่แยกหน้า
-    var items=page==='all'?_getAllItems():sortItems(exp.filter(function(item){
+    var items=page==='all'?_getAllItems():_exactMatchFirst(sortItems(exp.filter(function(item){
       if(sf==='PENDING_ACTIVE'){if(item.status!=='PENDING'&&item.status!=='ACTIVE')return false;}
       else if(sf==='TRANSFERRED'){if(!(item.borrow&&Array.isArray(item.borrow.TransferHistory)&&item.borrow.TransferHistory.length>0))return false;}
       else if(sf&&item.status!==sf)return false;
@@ -7299,7 +7321,9 @@ function getPageData(page){
       var isRet=sf==='RETURNED'||sf==='ACC_PENDING';
       var dateVal=isRet&&item.borrow&&item.borrow.ReturnDate?item.borrow.ReturnDate:item.loan.LoanDate;
       if(ds&&dateVal&&dateVal<ds)return false;if(de&&dateVal&&dateVal>de)return false;
-      var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');return!search||txt.toLowerCase().includes(search);}));
+      var txt=S(item.loan.LoanID)+' '+S(item.loan.BorrowerName)+' '+S(item.loan.DeptName)+' '+S(item.loan.PatientName)+' '+S(item.eq.name)+' '+(item.borrow?S(item.borrow.EquipmentNo):'');return!search||txt.toLowerCase().includes(search);})),search,function(item){
+      return[S(item.loan.LoanID),S(item.loan.BorrowerName),S(item.loan.DeptName),S(item.loan.PatientName),S(item.eq.name),item.borrow?S(item.borrow.EquipmentNo):''];
+    });
     rows.push(['LoanID','วันที่ยืม','ผู้ยืม','แผนก','ผู้ป่วย','เครื่องมือ','หมายเลขเครื่อง','อุปกรณ์ประกอบ','วันที่ใช้','สถานะ','ผู้ให้ยืม','ผู้รับคืน','วันที่คืน','เหตุผลคืน','ประวัติโอน']);
     items.forEach(function(item){var ld=item.loan.LoanDate,startD=ld?new Date(ld):null,endD=item.borrow&&item.borrow.ReturnDate?new Date(item.borrow.ReturnDate):now;var days=startD&&(item.status==='ACTIVE'||item.status==='RETURNED'||item.status==='ACC_PENDING')?Math.max(0,Math.round((endD-startD)/86400000)):'-';var accs=item.borrow&&Array.isArray(item.borrow.Accessories)?item.borrow.Accessories:[];var th=item.borrow&&Array.isArray(item.borrow.TransferHistory)?item.borrow.TransferHistory:[];rows.push([S(item.loan.LoanID),ld||'',S(item.loan.BorrowerName),S(item.loan.DeptName),S(item.loan.PatientName),S(item.eq.name),item.borrow?S(item.borrow.EquipmentNo||''):'-',accs.length||0,days,({PENDING:'รอดำเนินการจ่าย',ACTIVE:'ยืม',RETURNED:'คืน',ACC_PENDING:'คืน (อุปกรณ์ค้าง)',CANCELLED:'ยกเลิก'}[item.status]||item.status),item.borrow?S(item.borrow.GiverName||''):'-',item.borrow?S(item.borrow.ReceiverName||''):'-',item.borrow?S(item.borrow.ReturnDate||''):'-',item.borrow?S(item.borrow.ReturnRemark||''):'-',th.map(function(t){return t.date+':'+S(t.toDept);}).join('→')]);});
   }else if(page==='daily'){var filter=document.getElementById('dailyFilter').value;var activeItems=exp.filter(function(i){return i.status==='ACTIVE'&&(!filter||S(i.eq.name)===filter);});rows.push(['หมายเลขเครื่อง','ชนิดเครื่องมือ','วันที่ยืม','แผนก','ผู้ป่วย','วันที่ใช้','ผู้ให้ยืม','ประวัติโอน','อุปกรณ์ประกอบ']);activeItems.forEach(function(item){var ld=item.loan.LoanDate||'-',days=ld!=='-'?Math.max(0,Math.round((now-new Date(ld))/86400000)):'-';var th=item.borrow&&item.borrow.TransferHistory?item.borrow.TransferHistory:[];rows.push([item.borrow?S(item.borrow.EquipmentNo||'—'):'—',S(item.eq.name),ld,S(item.loan.DeptName),S(item.loan.PatientName),days,item.borrow?S(item.borrow.GiverName||'-'):'-',th.map(function(t){return S(t.toDept)+'('+t.date+')';}).join('→'),(item.borrow&&item.borrow.Accessories?item.borrow.Accessories.length:0)]);});}
